@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<assembly>
+    <id>release</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>false</includeBaseDirectory>
+
+    <files>
+        <file>
+            <source>target/classes/plugin-descriptor.properties</source>
+            <outputDirectory>/elasticsearch-load-segment-plugin/</outputDirectory>
+        </file>
+    </files>
+
+    <dependencySets>
+        <dependencySet>
+            <outputDirectory>/elasticsearch-load-segment-plugin/</outputDirectory>
+            <useProjectArtifact>true</useProjectArtifact>
+            <useTransitiveDependencies>true</useTransitiveDependencies>
+        </dependencySet>
+    </dependencySets>
+
+</assembly>
