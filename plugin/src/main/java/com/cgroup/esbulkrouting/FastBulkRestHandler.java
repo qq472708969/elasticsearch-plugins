@@ -80,10 +80,6 @@ public class FastBulkRestHandler extends BaseRestHandler {
         });
     }
 
-    private String selectShardNo(String shardIdNo) {
-        return null;
-    }
-
     private void paramsCheck(RestRequest request) {
         //废除routing参数，改用shard_id参数
         String defaultRouting = request.param("routing");
