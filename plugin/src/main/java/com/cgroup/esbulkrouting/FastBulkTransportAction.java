@@ -32,6 +32,7 @@ import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.settings.SettingsFilter;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.AbstractRunnable;
 import org.elasticsearch.common.util.concurrent.AtomicArray;
@@ -54,6 +55,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
+import static com.cgroup.esbulkrouting.FastBulkAction.SETTING_ROUTING_SLOT;
 import static java.util.Collections.emptyMap;
 
 /**
@@ -69,6 +71,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
     private final TransportCreateIndexAction createIndexAction;
     private final LongSupplier relativeTimeProvider;
     private final IngestActionForwarder ingestForwarder;
+    private final SettingsFilter settingsFilter;
     private static final String DROPPED_ITEM_WITH_AUTO_GENERATED_ID = "auto-generated";
 
     @Inject
@@ -76,7 +79,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                                    ClusterService clusterService, IndicesService indexServices, IngestService ingestService,
                                    TransportShardBulkAction shardBulkAction, TransportCreateIndexAction createIndexAction,
                                    ActionFilters actionFilters, IndexNameExpressionResolver indexNameExpressionResolver,
-                                   AutoCreateIndex autoCreateIndex) {
+                                   AutoCreateIndex autoCreateIndex, SettingsFilter settingsFilter) {
         super(settings, FastBulkAction.NAME, threadPool, transportService, actionFilters, indexNameExpressionResolver, BulkRequest::new);
         LongSupplier relativeTimeProvider = System::nanoTime;
         this.clusterService = clusterService;
@@ -87,6 +90,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
         this.autoCreateIndex = autoCreateIndex;
         this.relativeTimeProvider = relativeTimeProvider;
         this.ingestForwarder = new IngestActionForwarder(transportService);
+        this.settingsFilter = settingsFilter;
         clusterService.addStateApplier(this.ingestForwarder);
     }
 
@@ -294,7 +298,9 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
         private final long startTimeNanos;
         private final ClusterStateObserver observer;
         private final Map<String, IndexNotFoundException> indicesThatCannotBeCreated;
+        private IndexMetaData esIndexMetaData;
         private int shardNo;
+        private int slotNo;
 
         FastBulkOperation(Task task, BulkRequest bulkRequest, ActionListener<BulkResponse> listener, AtomicArray<BulkItemResponse> responses,
                           long startTimeNanos, Map<String, IndexNotFoundException> indicesThatCannotBeCreated) {
@@ -311,25 +317,42 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
         private void buildShardNo(BulkRequest bulkRequest) {
             DocWriteRequest<?> docWriteRequest = bulkRequest.requests().get(0);
             String routing = docWriteRequest.routing();
+            String indexName = docWriteRequest.index();
+            IndexMetaData esIndexMetaData = clusterService.state().metaData().index(indexName);
+            this.esIndexMetaData = esIndexMetaData;
+            int routingNumShards = esIndexMetaData.getRoutingNumShards();
             if (routing == null) {
-                String indexName = docWriteRequest.index();
-                IndexMetaData esIndexMetaData = clusterService.state().metaData().index(indexName);
-                String indexUUID = esIndexMetaData.getIndexUUID();
-                int routingNumShards = esIndexMetaData.getRoutingNumShards();
-                logger.info("=====routingNumShards:{}", routingNumShards);
-                long minCount = Long.MAX_VALUE;
-                for (int i = 0; i < routingNumShards; i++) {
-                    ShardId shardId = new ShardId(indexName, indexUUID, i);
-                    long count = indexServices.getShardOrNull(shardId).docStats().getCount();
-                    if (count < minCount) {
-                        minCount = count;
-                        shardNo = i;
-                    }
-                }
-                logger.info("=====fast_bulk自动计算shard编号:{}", shardNo);
+                littleHighPriority(indexName, esIndexMetaData, routingNumShards);
             } else {
-                logger.info("=====外部参数指定shard编号:{}", routing);
+                /**
+                 * 创建索引时，是否添加了routing_slot参数
+                 */
+                Settings filter = settingsFilter.filter(esIndexMetaData.getSettings());
+                String slotStr = filter.get(SETTING_ROUTING_SLOT, "-1");
+                int slotNo = Integer.valueOf(slotStr);
+                this.slotNo = slotNo;
+                /**
+                 * 不等
+                 */
+                if ("-1".equals(slotNo)) {
+                    logger.info("=====外部参数指定shard编号:{}", routing);
+                }
             }
+        }
+
+        private void littleHighPriority(String indexName, IndexMetaData esIndexMetaData, int routingNumShards) {
+            String indexUUID = esIndexMetaData.getIndexUUID();
+            logger.info("=====routingNumShards:{}", routingNumShards);
+            long minCount = Long.MAX_VALUE;
+            for (int i = 0; i < routingNumShards; i++) {
+                ShardId shardId = new ShardId(indexName, indexUUID, i);
+                long count = indexServices.getShardOrNull(shardId).docStats().getCount();
+                if (count < minCount) {
+                    minCount = count;
+                    shardNo = i;
+                }
+            }
+            logger.info("=====fast_bulk自动计算shard编号:{}", shardNo);
         }
 
         @Override
@@ -406,7 +429,14 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                 if (routing == null) {
                     shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, shardNo).shardId();
                 } else {
-                    shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, Integer.valueOf(request.routing())).shardId();
+                    /**
+                     * 如果没有配置routing_slot则直接使用外部传入的shard_no(也就是routing)
+                     */
+                    if ("-1".equals(slotNo)) {
+                        shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, Integer.valueOf(request.routing())).shardId();
+                    } else {
+                        shardId = getShardId(esIndexMetaData, shardNo, request.routing(), request.id());
+                    }
                 }
                 List<BulkItemRequest> shardRequests = requestsByShard.computeIfAbsent(shardId, shard -> new ArrayList<>());
                 shardRequests.add(new BulkItemRequest(i, request));
@@ -465,6 +495,10 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                     }
                 });
             }
+        }
+
+        private ShardId getShardId(IndexMetaData esIndexMetaData, int shardNo, String routing, String id) {
+            return null;
         }
 
         private boolean handleBlockExceptions(ClusterState state) {

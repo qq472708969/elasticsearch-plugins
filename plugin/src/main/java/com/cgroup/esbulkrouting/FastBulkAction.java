@@ -14,6 +14,7 @@ public class FastBulkAction extends Action<BulkRequest, BulkResponse, FastBulkRe
 
     public static final FastBulkAction INSTANCE = new FastBulkAction();
     public static final String NAME = "indices:data/write/fast_bulk";
+    public static final String SETTING_ROUTING_SLOT = "index.routing_slot";
 
     public FastBulkAction() {
         super(NAME);

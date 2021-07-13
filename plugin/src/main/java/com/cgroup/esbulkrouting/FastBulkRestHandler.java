@@ -23,6 +23,7 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.cgroup.esbulkrouting.FastBulkAction.SETTING_ROUTING_SLOT;
 import static org.elasticsearch.rest.RestRequest.Method.POST;
 import static org.elasticsearch.rest.RestRequest.Method.PUT;
 
@@ -56,7 +57,7 @@ public class FastBulkRestHandler extends BaseRestHandler {
         if (maxNumShards < 1) {
             throw new IllegalArgumentException("es.index.max_number_of_shards must be > 0");
         }
-        String SETTING_ROUTING_SLOT = "index.routing_slot";
+
 
         Setting<Integer> integerSetting = Setting.intSetting(SETTING_ROUTING_SLOT, 1, 1, maxNumShards,
                 Setting.Property.IndexScope, Setting.Property.Final);
