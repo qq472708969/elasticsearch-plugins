@@ -1,7 +1,6 @@
 package com.cgroup.esbulkrouting;
 
 import org.elasticsearch.action.ActionRequestBuilder;
-import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteRequestBuilder;
@@ -20,15 +19,15 @@ import org.elasticsearch.common.xcontent.XContentType;
 /**
  * Created by zzq on 2021/7/5.
  */
-public class FastBulkRequestBuilder extends ActionRequestBuilder<BulkRequest, BulkResponse, FastBulkRequestBuilder>
+public class FastBulkRequestBuilder extends ActionRequestBuilder<FastBulkRequest, BulkResponse, FastBulkRequestBuilder>
         implements WriteRequestBuilder<FastBulkRequestBuilder> {
 
     public FastBulkRequestBuilder(ElasticsearchClient client, FastBulkAction action, @Nullable String globalIndex, @Nullable String globalType) {
-        super(client, action, new BulkRequest(globalIndex, globalType));
+        super(client, action, new FastBulkRequest(globalIndex, globalType));
     }
 
     public FastBulkRequestBuilder(ElasticsearchClient client, FastBulkAction action) {
-        super(client, action, new BulkRequest());
+        super(client, action, new FastBulkRequest());
     }
 
     /**

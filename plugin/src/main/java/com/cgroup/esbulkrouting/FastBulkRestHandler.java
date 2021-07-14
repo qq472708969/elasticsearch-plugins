@@ -1,11 +1,9 @@
 package com.cgroup.esbulkrouting;
 
 import org.apache.logging.log4j.LogManager;
-import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.bulk.BulkShardRequest;
 import org.elasticsearch.action.support.ActiveShardCount;
-import org.elasticsearch.client.Requests;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.IndexScopedSettings;
@@ -122,10 +120,10 @@ public class FastBulkRestHandler extends BaseRestHandler {
     @Override
     public RestChannelConsumer prepareRequest(final RestRequest request, final NodeClient client) throws IOException {
         paramsCheck(request);
-        String shardNo = request.param("shard_no");
-        String defaultRouting = shardNo;
+        String defaultRouting = request.param("routing");
+        String defaultShardNo = request.param("shard_no");
 
-        BulkRequest bulkRequest = Requests.bulkRequest();
+        FastBulkRequest fastBulkRequest = new FastBulkRequest();
         String defaultIndex = request.param("index");
         String defaultType = request.param("type");
         FetchSourceContext defaultFetchSourceContext = FetchSourceContext.parseFromRestRequest(request);
@@ -137,14 +135,14 @@ public class FastBulkRestHandler extends BaseRestHandler {
         String defaultPipeline = request.param("pipeline");
         String waitForActiveShards = request.param("wait_for_active_shards");
         if (waitForActiveShards != null) {
-            bulkRequest.waitForActiveShards(ActiveShardCount.parseString(waitForActiveShards));
+            fastBulkRequest.waitForActiveShards(ActiveShardCount.parseString(waitForActiveShards));
         }
-        bulkRequest.timeout(request.paramAsTime("timeout", BulkShardRequest.DEFAULT_TIMEOUT));
-        bulkRequest.setRefreshPolicy(request.param("refresh"));
-        bulkRequest.add(request.requiredContent(), defaultIndex, defaultType, defaultRouting, defaultFields,
+        fastBulkRequest.timeout(request.paramAsTime("timeout", BulkShardRequest.DEFAULT_TIMEOUT));
+        fastBulkRequest.setRefreshPolicy(request.param("refresh"));
+        fastBulkRequest.add(request.requiredContent(), defaultIndex, defaultType, defaultRouting, defaultShardNo, defaultFields,
                 defaultFetchSourceContext, defaultPipeline, null, allowExplicitIndex, request.getXContentType());
 
-        return restChannel -> client.executeLocally(FastBulkAction.INSTANCE, bulkRequest, new RestBuilderListener<BulkResponse>(restChannel) {
+        return restChannel -> client.executeLocally(FastBulkAction.INSTANCE, fastBulkRequest, new RestBuilderListener<BulkResponse>(restChannel) {
             @Override
             public RestResponse buildResponse(BulkResponse responses, XContentBuilder builder) throws Exception {
                 return new BytesRestResponse(RestStatus.OK, responses.toXContent(builder, ToXContent.EMPTY_PARAMS));
@@ -154,11 +152,11 @@ public class FastBulkRestHandler extends BaseRestHandler {
 
     private void paramsCheck(RestRequest request) {
         //废除routing参数，改用shard_id参数
-        String defaultRouting = request.param("routing");
-        if (defaultRouting != null) {
-            throw new RuntimeException(
-                    "_fast_bulk接口已经废弃了routing参数，支持显示直接传递shard_no（分片id编号）; shard_no必须为非负整数；\n 并且使用_fast_bulk后，索引查询也不能使用routing参数");
-        }
+        //String defaultRouting = request.param("routing");
+        //if (defaultRouting != null) {
+        //    throw new RuntimeException(
+        //            "_fast_bulk接口已经废弃了routing参数，支持显示直接传递shard_no（分片id编号）; shard_no必须为非负整数；\n 并且使用_fast_bulk后，索引查询也不能使用routing参数");
+        //}
         String shardNo = request.param("shard_no");
         if (shardNo != null) {
             Integer.valueOf(shardNo);

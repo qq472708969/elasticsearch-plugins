@@ -20,7 +20,6 @@ import org.elasticsearch.action.ingest.IngestActionForwarder;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.AutoCreateIndex;
 import org.elasticsearch.action.support.HandledTransportAction;
-import org.elasticsearch.action.update.TransportUpdateAction;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.cluster.ClusterState;
@@ -29,8 +28,10 @@ import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.metadata.*;
 import org.elasticsearch.cluster.service.ClusterService;
+import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.inject.Inject;
+import org.elasticsearch.common.io.stream.*;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.settings.SettingsFilter;
 import org.elasticsearch.common.unit.TimeValue;
@@ -61,7 +62,7 @@ import static java.util.Collections.emptyMap;
 /**
  * Created by zzq on 2021/7/5.
  */
-public class FastBulkTransportAction extends HandledTransportAction<BulkRequest, BulkResponse> {
+public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequest, BulkResponse> {
     protected final org.apache.logging.log4j.Logger logger = LogManager.getLogger(this.getClass());
     private final AutoCreateIndex autoCreateIndex;
     private final ClusterService clusterService;
@@ -80,7 +81,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                                    TransportShardBulkAction shardBulkAction, TransportCreateIndexAction createIndexAction,
                                    ActionFilters actionFilters, IndexNameExpressionResolver indexNameExpressionResolver,
                                    AutoCreateIndex autoCreateIndex, SettingsFilter settingsFilter) {
-        super(settings, FastBulkAction.NAME, threadPool, transportService, actionFilters, indexNameExpressionResolver, BulkRequest::new);
+        super(settings, FastBulkAction.NAME, threadPool, transportService, actionFilters, indexNameExpressionResolver, FastBulkRequest::new);
         LongSupplier relativeTimeProvider = System::nanoTime;
         this.clusterService = clusterService;
         this.indexServices = indexServices;
@@ -95,47 +96,47 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
     }
 
     /**
-     * Retrieves the {@link IndexRequest} from the provided {@link DocWriteRequest} for index or upsert actions.  Upserts are
-     * modeled as {@link IndexRequest} inside the {@link UpdateRequest}. Ignores {@link org.elasticsearch.action.delete.DeleteRequest}'s
+     * Retrieves the {@link FastIndexRequest} from the provided {@link DocWriteRequest} for index or upsert actions.  Upserts are
+     * modeled as {@link FastIndexRequest} inside the {@link UpdateRequest}. Ignores {@link org.elasticsearch.action.delete.DeleteRequest}'s
      *
-     * @param docWriteRequest The request to find the {@link IndexRequest}
-     * @return the found {@link IndexRequest} or {@code null} if one can not be found.
+     * @param docWriteRequest The request to find the {@link FastIndexRequest}
+     * @return the found {@link FastIndexRequest} or {@code null} if one can not be found.
      */
-    public static IndexRequest getIndexWriteRequest(DocWriteRequest docWriteRequest) {
-        IndexRequest indexRequest = null;
-        if (docWriteRequest instanceof IndexRequest) {
-            indexRequest = (IndexRequest) docWriteRequest;
+    public static FastIndexRequest getIndexWriteRequest(DocWriteRequest docWriteRequest) {
+        FastIndexRequest fastIndexRequest = null;
+        if (docWriteRequest instanceof FastIndexRequest) {
+            fastIndexRequest = (FastIndexRequest) docWriteRequest;
         } else if (docWriteRequest instanceof UpdateRequest) {
-            UpdateRequest updateRequest = (UpdateRequest) docWriteRequest;
-            indexRequest = updateRequest.docAsUpsert() ? updateRequest.doc() : updateRequest.upsertRequest();
+            FastUpdateRequest fastUpdateRequest = (FastUpdateRequest) docWriteRequest;
+            fastIndexRequest = fastUpdateRequest.docAsUpsert() ? fastUpdateRequest.doc() : fastUpdateRequest.upsertRequest();
         }
-        return indexRequest;
+        return fastIndexRequest;
     }
 
     @Override
-    protected final void doExecute(final BulkRequest bulkRequest, final ActionListener<BulkResponse> listener) {
+    protected final void doExecute(final FastBulkRequest fastBulkRequest, final ActionListener<BulkResponse> listener) {
         throw new UnsupportedOperationException("task parameter is required for this operation");
     }
 
     @Override
-    protected void doExecute(Task task, BulkRequest bulkRequest, ActionListener<BulkResponse> listener) {
+    protected void doExecute(Task task, FastBulkRequest fastBulkRequest, ActionListener<BulkResponse> listener) {
         final long startTime = relativeTime();
-        final AtomicArray<BulkItemResponse> responses = new AtomicArray<>(bulkRequest.requests().size());
+        final AtomicArray<BulkItemResponse> responses = new AtomicArray<>(fastBulkRequest.requests().size());
 
         boolean hasIndexRequestsWithPipelines = false;
         final MetaData metaData = clusterService.state().getMetaData();
         ImmutableOpenMap<String, IndexMetaData> indicesMetaData = metaData.indices();
-        for (DocWriteRequest<?> actionRequest : bulkRequest.requests()) {
-            IndexRequest indexRequest = getIndexWriteRequest(actionRequest);
-            if (indexRequest != null) {
+        for (DocWriteRequest<?> actionRequest : fastBulkRequest.requests()) {
+            FastIndexRequest fastIndexRequest = getIndexWriteRequest(actionRequest);
+            if (fastIndexRequest != null) {
                 // get pipeline from request
-                String pipeline = indexRequest.getPipeline();
+                String pipeline = fastIndexRequest.getPipeline();
                 if (pipeline == null) {
                     // start to look for default pipeline via settings found in the index meta data
                     IndexMetaData indexMetaData = indicesMetaData.get(actionRequest.index());
-                    if (indexMetaData == null && indexRequest.index() != null) {
+                    if (indexMetaData == null && fastIndexRequest.index() != null) {
                         // if the write request if through an alias use the write index's meta data
-                        AliasOrIndex indexOrAlias = metaData.getAliasAndIndexLookup().get(indexRequest.index());
+                        AliasOrIndex indexOrAlias = metaData.getAliasAndIndexLookup().get(fastIndexRequest.index());
                         if (indexOrAlias != null && indexOrAlias.isAlias()) {
                             AliasOrIndex.Alias alias = (AliasOrIndex.Alias) indexOrAlias;
                             indexMetaData = alias.getWriteIndex();
@@ -144,13 +145,13 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                     if (indexMetaData != null) {
                         // Find the the default pipeline if one is defined from and existing index.
                         String defaultPipeline = IndexSettings.DEFAULT_PIPELINE.get(indexMetaData.getSettings());
-                        indexRequest.setPipeline(defaultPipeline);
+                        fastIndexRequest.setPipeline(defaultPipeline);
                         if (IngestService.NOOP_PIPELINE_NAME.equals(defaultPipeline) == false) {
                             hasIndexRequestsWithPipelines = true;
                         }
-                    } else if (indexRequest.index() != null) {
+                    } else if (fastIndexRequest.index() != null) {
                         // No index exists yet (and is valid request), so matching index templates to look for a default pipeline
-                        List<IndexTemplateMetaData> templates = MetaDataIndexTemplateService.findTemplates(metaData, indexRequest.index());
+                        List<IndexTemplateMetaData> templates = MetaDataIndexTemplateService.findTemplates(metaData, fastIndexRequest.index());
                         assert (templates != null);
                         String defaultPipeline = IngestService.NOOP_PIPELINE_NAME;
                         // order of templates are highest order first, break if we find a default_pipeline
@@ -161,7 +162,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                                 break;
                             }
                         }
-                        indexRequest.setPipeline(defaultPipeline);
+                        fastIndexRequest.setPipeline(defaultPipeline);
                         if (IngestService.NOOP_PIPELINE_NAME.equals(defaultPipeline) == false) {
                             hasIndexRequestsWithPipelines = true;
                         }
@@ -178,9 +179,9 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
             // this path is never taken.
             try {
                 if (clusterService.localNode().isIngestNode()) {
-                    processBulkIndexIngestRequest(task, bulkRequest, listener);
+                    processFastBulkIndexIngestRequest(task, fastBulkRequest, listener);
                 } else {
-                    ingestForwarder.forwardIngestRequest(BulkAction.INSTANCE, bulkRequest, listener);
+                    ingestForwarder.forwardIngestRequest(BulkAction.INSTANCE, fastBulkRequest, listener);
                 }
             } catch (Exception e) {
                 listener.onFailure(e);
@@ -191,7 +192,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
         if (needToCheck()) {
             // Attempt to create all the indices that we're going to need during the bulk before we start.
             // Step 1: collect all the indices in the request
-            final Set<String> indices = bulkRequest.requests().stream()
+            final Set<String> indices = fastBulkRequest.requests().stream()
                     // delete requests should not attempt to create the index (if the index does not
                     // exists), unless an external versioning is used
                     .filter(request -> request.opType() != DocWriteRequest.OpType.DELETE
@@ -218,15 +219,15 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
             }
             // Step 3: create all the indices that are missing, if there are any missing. start the bulk after all the creates come back.
             if (autoCreateIndices.isEmpty()) {
-                executeBulk(task, bulkRequest, startTime, listener, responses, indicesThatCannotBeCreated);
+                executeBulk(task, fastBulkRequest, startTime, listener, responses, indicesThatCannotBeCreated);
             } else {
                 final AtomicInteger counter = new AtomicInteger(autoCreateIndices.size());
                 for (String index : autoCreateIndices) {
-                    createIndex(index, bulkRequest.timeout(), new ActionListener<CreateIndexResponse>() {
+                    createIndex(index, fastBulkRequest.timeout(), new ActionListener<CreateIndexResponse>() {
                         @Override
                         public void onResponse(CreateIndexResponse result) {
                             if (counter.decrementAndGet() == 0) {
-                                executeBulk(task, bulkRequest, startTime, listener, responses, indicesThatCannotBeCreated);
+                                executeBulk(task, fastBulkRequest, startTime, listener, responses, indicesThatCannotBeCreated);
                             }
                         }
 
@@ -234,15 +235,15 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                         public void onFailure(Exception e) {
                             if (!(ExceptionsHelper.unwrapCause(e) instanceof ResourceAlreadyExistsException)) {
                                 // fail all requests involving this index, if create didn't work
-                                for (int i = 0; i < bulkRequest.requests().size(); i++) {
-                                    DocWriteRequest request = bulkRequest.requests().get(i);
+                                for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
+                                    DocWriteRequest request = fastBulkRequest.requests().get(i);
                                     if (request != null && setResponseFailureIfIndexMatches(responses, i, request, index, e)) {
-                                        bulkRequest.requests().set(i, null);
+                                        fastBulkRequest.requests().set(i, null);
                                     }
                                 }
                             }
                             if (counter.decrementAndGet() == 0) {
-                                executeBulk(task, bulkRequest, startTime, ActionListener.wrap(listener::onResponse, inner -> {
+                                executeBulk(task, fastBulkRequest, startTime, ActionListener.wrap(listener::onResponse, inner -> {
                                     inner.addSuppressed(e);
                                     listener.onFailure(inner);
                                 }), responses, indicesThatCannotBeCreated);
@@ -252,7 +253,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                 }
             }
         } else {
-            executeBulk(task, bulkRequest, startTime, listener, responses, emptyMap());
+            executeBulk(task, fastBulkRequest, startTime, listener, responses, emptyMap());
         }
     }
 
@@ -292,7 +293,7 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
      */
     private final class FastBulkOperation extends AbstractRunnable {
         private final Task task;
-        private final BulkRequest bulkRequest;
+        private final FastBulkRequest fastBulkRequest;
         private final ActionListener<BulkResponse> listener;
         private final AtomicArray<BulkItemResponse> responses;
         private final long startTimeNanos;
@@ -300,43 +301,51 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
         private final Map<String, IndexNotFoundException> indicesThatCannotBeCreated;
         private IndexMetaData esIndexMetaData;
         private int shardNo;
-        private int slotNo;
+        private int slotCount;
+        private int SLOT_COUNT_DEFAULT = -1;
+        private int routingNumShards;
 
-        FastBulkOperation(Task task, BulkRequest bulkRequest, ActionListener<BulkResponse> listener, AtomicArray<BulkItemResponse> responses,
+        FastBulkOperation(Task task, FastBulkRequest fastBulkRequest, ActionListener<BulkResponse> listener, AtomicArray<BulkItemResponse> responses,
                           long startTimeNanos, Map<String, IndexNotFoundException> indicesThatCannotBeCreated) {
             this.task = task;
-            this.bulkRequest = bulkRequest;
+            this.fastBulkRequest = fastBulkRequest;
             this.listener = listener;
             this.responses = responses;
             this.startTimeNanos = startTimeNanos;
             this.indicesThatCannotBeCreated = indicesThatCannotBeCreated;
-            this.observer = new ClusterStateObserver(clusterService, bulkRequest.timeout(), logger, threadPool.getThreadContext());
-            buildShardNo(bulkRequest);
+            this.observer = new ClusterStateObserver(clusterService, fastBulkRequest.timeout(), logger, threadPool.getThreadContext());
+            buildShardNo(fastBulkRequest);
         }
 
-        private void buildShardNo(BulkRequest bulkRequest) {
-            DocWriteRequest<?> docWriteRequest = bulkRequest.requests().get(0);
-            String routing = docWriteRequest.routing();
-            String indexName = docWriteRequest.index();
-            IndexMetaData esIndexMetaData = clusterService.state().metaData().index(indexName);
-            this.esIndexMetaData = esIndexMetaData;
-            int routingNumShards = esIndexMetaData.getRoutingNumShards();
-            if (routing == null) {
-                littleHighPriority(indexName, esIndexMetaData, routingNumShards);
-            } else {
+        private void buildShardNo(FastBulkRequest fastBulkRequest) {
+            /**
+             * doc中已经禁用了这个参数，如果url中指定了shard_no，则写入数据列表中每条数据的shardNo编号是同一个；
+             */
+            FastIndexRequest fastIndexRequest = (FastIndexRequest) fastBulkRequest.requests().get(0);
+            String requestShardNo = fastIndexRequest.shardNo();
+            String indexName = fastIndexRequest.index();
+            this.esIndexMetaData = clusterService.state().metaData().index(indexName);
+            this.routingNumShards = esIndexMetaData.getRoutingNumShards();
+            if (requestShardNo == null) {
                 /**
-                 * 创建索引时，是否添加了routing_slot参数
+                 * shard_no不存在
                  */
                 Settings filter = settingsFilter.filter(esIndexMetaData.getSettings());
-                String slotStr = filter.get(SETTING_ROUTING_SLOT, "-1");
-                int slotNo = Integer.valueOf(slotStr);
-                this.slotNo = slotNo;
-                /**
-                 * 不等
-                 */
-                if ("-1".equals(slotNo)) {
-                    logger.info("=====外部参数指定shard编号:{}", routing);
+                int slotCount = filter.getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
+                this.slotCount = slotCount;
+                if (SLOT_COUNT_DEFAULT == slotCount) {
+                    /**
+                     * shard_no不存在，并且index中没有配置routing_slot，则始终执行向doc数量少的shard写入数据，该批量操作为同一shard
+                     */
+                    littleHighPriority(indexName, esIndexMetaData, routingNumShards);
+                } else {
+                    logger.info("=====索引设置了slot数量:{}", slotCount);
                 }
+            } else {
+                /**
+                 * 只要url中指定了shard_no编号参数，则本次批量写入操作均指向该shard
+                 */
+                logger.info("=====使用外部参数指定的物理shard编号:{}", requestShardNo);
             }
         }
 
@@ -360,6 +369,22 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
             listener.onFailure(e);
         }
 
+        /**
+         * 根据外部指定
+         *
+         * @param esIndexMetaData
+         * @param routingNumShards
+         * @param slotCount
+         * @param slotNo
+         * @param id
+         * @return
+         */
+        private ShardId getShardId(IndexMetaData esIndexMetaData, int routingNumShards, int slotCount, String slotNo, String id) {
+            int slotSize = routingNumShards / slotCount;
+
+            return null;
+        }
+
         @Override
         protected void doRun() throws Exception {
             final ClusterState clusterState = observer.setAndGetObservedState();
@@ -368,8 +393,8 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
             }
             final ConcreteIndices concreteIndices = new ConcreteIndices(clusterState, indexNameExpressionResolver);
             MetaData metaData = clusterState.metaData();
-            for (int i = 0; i < bulkRequest.requests().size(); i++) {
-                DocWriteRequest docWriteRequest = bulkRequest.requests().get(i);
+            for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
+                DocWriteRequest docWriteRequest = fastBulkRequest.requests().get(i);
                 //the request can only be null because we set it to null in the previous step, so it gets ignored
                 if (docWriteRequest == null) {
                     continue;
@@ -382,17 +407,21 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                     switch (docWriteRequest.opType()) {
                         case CREATE:
                         case INDEX:
-                            IndexRequest indexRequest = (IndexRequest) docWriteRequest;
+                            FastIndexRequest fastIndexRequest = (FastIndexRequest) docWriteRequest;
                             final IndexMetaData indexMetaData = metaData.index(concreteIndex);
                             MappingMetaData mappingMd = indexMetaData.mappingOrDefault(
-                                    indexMetaData.resolveDocumentType(indexRequest.type()));
+                                    indexMetaData.resolveDocumentType(fastIndexRequest.type()));
                             Version indexCreated = indexMetaData.getCreationVersion();
-                            indexRequest.resolveRouting(metaData);
-                            indexRequest.process(indexCreated, mappingMd, concreteIndex.getName());
+                            fastIndexRequest.resolveRouting(metaData);
+                            fastIndexRequest.process(indexCreated, mappingMd, concreteIndex.getName());
                             break;
                         case UPDATE:
-                            TransportUpdateAction.resolveAndValidateRouting(metaData, concreteIndex.getName(),
-                                    (UpdateRequest) docWriteRequest);
+                            FastUpdateRequest fastUpdateRequest = (FastUpdateRequest) docWriteRequest;
+                            fastUpdateRequest.routing((metaData.resolveWriteIndexRouting(fastUpdateRequest.parent(), fastUpdateRequest.routing(), fastUpdateRequest.index())));
+                            // Fail fast on the node that received the request, rather than failing when translating on the index or delete request.
+                            if (fastUpdateRequest.routing() == null && metaData.routingRequired(concreteIndex.getName(), fastUpdateRequest.type())) {
+                                throw new RoutingMissingException(concreteIndex.getName(), fastUpdateRequest.type(), fastUpdateRequest.id());
+                            }
                             break;
                         case DELETE:
                             docWriteRequest.routing(metaData.resolveWriteIndexRouting(docWriteRequest.parent(), docWriteRequest.routing(),
@@ -412,34 +441,46 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                     BulkItemResponse bulkItemResponse = new BulkItemResponse(i, docWriteRequest.opType(), failure);
                     responses.set(i, bulkItemResponse);
                     // make sure the request gets never processed again
-                    bulkRequest.requests().set(i, null);
+                    fastBulkRequest.requests().set(i, null);
                 }
             }
 
             // first, go over all the requests and create a ShardId -> Operations mapping
             Map<ShardId, List<BulkItemRequest>> requestsByShard = new HashMap<>();
-            for (int i = 0; i < bulkRequest.requests().size(); i++) {
-                DocWriteRequest request = bulkRequest.requests().get(i);
+            for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
+                FastDocWriteRequest request = (FastDocWriteRequest) fastBulkRequest.requests().get(i);
                 if (request == null) {
                     continue;
                 }
-                String routing = request.routing();
+                String requestShardNo = request.shardNo();
                 ShardId shardId;
                 String concreteIndex = concreteIndices.getConcreteIndex(request.index()).getName();
-                if (routing == null) {
-                    shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, shardNo).shardId();
+                if (requestShardNo == null) {
+                    /**
+                     * 如果没有配置routing_slot则直接使用外部传入的es实际物理shard_no编号
+                     */
+                    if (SLOT_COUNT_DEFAULT == slotCount) {
+                        shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, shardNo).shardId();
+                    } else {
+                        /**
+                         * 该方法用来计算依据逻辑slot，映射到的物理shard
+                         */
+                        shardId = getShardId(esIndexMetaData, routingNumShards, slotCount, request.routing(), request.id());
+                    }
                 } else {
                     /**
-                     * 如果没有配置routing_slot则直接使用外部传入的shard_no(也就是routing)
+                     * url中指定了shard_no参数，则始终向指定的shard分配数据
                      */
-                    if ("-1".equals(slotNo)) {
-                        shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, Integer.valueOf(request.routing())).shardId();
-                    } else {
-                        shardId = getShardId(esIndexMetaData, shardNo, request.routing(), request.id());
-                    }
+                    shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, Integer.valueOf(requestShardNo)).shardId();
                 }
                 List<BulkItemRequest> shardRequests = requestsByShard.computeIfAbsent(shardId, shard -> new ArrayList<>());
-                shardRequests.add(new BulkItemRequest(i, request));
+                BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
+                request.writeToStream(bytesStreamOutput);
+                BytesReference bytes = bytesStreamOutput.bytes();
+                StreamInput streamInput = bytes.streamInput();
+                IndexRequest indexRequest = new IndexRequest();
+                indexRequest.readFrom(streamInput);
+                shardRequests.add(new BulkItemRequest(i, indexRequest));
             }
 
             if (requestsByShard.isEmpty()) {
@@ -453,10 +494,10 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
             for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
                 final ShardId shardId = entry.getKey();
                 final List<BulkItemRequest> requests = entry.getValue();
-                BulkShardRequest bulkShardRequest = new BulkShardRequest(shardId, bulkRequest.getRefreshPolicy(),
+                BulkShardRequest bulkShardRequest = new BulkShardRequest(shardId, fastBulkRequest.getRefreshPolicy(),
                         requests.toArray(new BulkItemRequest[requests.size()]));
-                bulkShardRequest.waitForActiveShards(bulkRequest.waitForActiveShards());
-                bulkShardRequest.timeout(bulkRequest.timeout());
+                bulkShardRequest.waitForActiveShards(fastBulkRequest.waitForActiveShards());
+                bulkShardRequest.timeout(fastBulkRequest.timeout());
                 if (task != null) {
                     bulkShardRequest.setParentTask(nodeId, task.getId());
                 }
@@ -495,10 +536,6 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                     }
                 });
             }
-        }
-
-        private ShardId getShardId(IndexMetaData esIndexMetaData, int shardNo, String routing, String id) {
-            return null;
         }
 
         private boolean handleBlockExceptions(ClusterState state) {
@@ -572,13 +609,13 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
             BulkItemResponse bulkItemResponse = new BulkItemResponse(idx, request.opType(), failure);
             responses.set(idx, bulkItemResponse);
             // make sure the request gets never processed again
-            bulkRequest.requests().set(idx, null);
+            fastBulkRequest.requests().set(idx, null);
         }
     }
 
-    void executeBulk(Task task, final BulkRequest bulkRequest, final long startTimeNanos, final ActionListener<BulkResponse> listener,
+    void executeBulk(Task task, final FastBulkRequest fastBulkRequest, final long startTimeNanos, final ActionListener<BulkResponse> listener,
                      final AtomicArray<BulkItemResponse> responses, Map<String, IndexNotFoundException> indicesThatCannotBeCreated) {
-        new FastBulkOperation(task, bulkRequest, listener, responses, startTimeNanos, indicesThatCannotBeCreated).run();
+        new FastBulkOperation(task, fastBulkRequest, listener, responses, startTimeNanos, indicesThatCannotBeCreated).run();
     }
 
     private static class ConcreteIndices {
@@ -609,81 +646,81 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
         return relativeTimeProvider.getAsLong();
     }
 
-    void processBulkIndexIngestRequest(Task task, BulkRequest original, ActionListener<BulkResponse> listener) {
+    void processFastBulkIndexIngestRequest(Task task, FastBulkRequest original, ActionListener<BulkResponse> listener) {
         long ingestStartTimeInNanos = System.nanoTime();
-        BulkRequestModifier bulkRequestModifier = new BulkRequestModifier(original);
-        ingestService.executeBulkRequest(() -> bulkRequestModifier,
+        FastBulkRequestModifier fastBulkRequestModifier = new FastBulkRequestModifier(original);
+        ingestService.executeBulkRequest(() -> fastBulkRequestModifier,
                 (indexRequest, exception) -> {
                     logger.debug(() -> new ParameterizedMessage("failed to execute pipeline [{}] for document [{}/{}/{}]",
                             indexRequest.getPipeline(), indexRequest.index(), indexRequest.type(), indexRequest.id()), exception);
-                    bulkRequestModifier.markCurrentItemAsFailed(exception);
+                    fastBulkRequestModifier.markCurrentItemAsFailed(exception);
                 }, (exception) -> {
                     if (exception != null) {
                         logger.error("failed to execute pipeline for a bulk request", exception);
                         listener.onFailure(exception);
                     } else {
                         long ingestTookInMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ingestStartTimeInNanos);
-                        BulkRequest bulkRequest = bulkRequestModifier.getBulkRequest();
-                        ActionListener<BulkResponse> actionListener = bulkRequestModifier.wrapActionListenerIfNeeded(ingestTookInMillis,
+                        FastBulkRequest fastBulkRequest = fastBulkRequestModifier.getFastBulkRequest();
+                        ActionListener<BulkResponse> actionListener = fastBulkRequestModifier.wrapActionListenerIfNeeded(ingestTookInMillis,
                                 listener);
-                        if (bulkRequest.requests().isEmpty()) {
+                        if (fastBulkRequest.requests().isEmpty()) {
                             // at this stage, the transport bulk action can't deal with a bulk request with no requests,
                             // so we stop and send an empty response back to the client.
                             // (this will happen if pre-processing all items in the bulk failed)
                             actionListener.onResponse(new BulkResponse(new BulkItemResponse[0], 0));
                         } else {
-                            doExecute(task, bulkRequest, actionListener);
+                            doExecute(task, fastBulkRequest, actionListener);
                         }
                     }
                 },
-                indexRequest -> bulkRequestModifier.markCurrentItemAsDropped());
+                indexRequest -> fastBulkRequestModifier.markCurrentItemAsDropped());
     }
 
-    static final class BulkRequestModifier implements Iterator<DocWriteRequest<?>> {
+    static final class FastBulkRequestModifier implements Iterator<DocWriteRequest<?>> {
 
-        final BulkRequest bulkRequest;
+        final FastBulkRequest fastBulkRequest;
         final SparseFixedBitSet failedSlots;
         final List<BulkItemResponse> itemResponses;
 
         int currentSlot = -1;
         int[] originalSlots;
 
-        BulkRequestModifier(BulkRequest bulkRequest) {
-            this.bulkRequest = bulkRequest;
-            this.failedSlots = new SparseFixedBitSet(bulkRequest.requests().size());
-            this.itemResponses = new ArrayList<>(bulkRequest.requests().size());
+        FastBulkRequestModifier(FastBulkRequest fastBulkRequest) {
+            this.fastBulkRequest = fastBulkRequest;
+            this.failedSlots = new SparseFixedBitSet(fastBulkRequest.requests().size());
+            this.itemResponses = new ArrayList<>(fastBulkRequest.requests().size());
         }
 
         @Override
         public DocWriteRequest next() {
-            return bulkRequest.requests().get(++currentSlot);
+            return fastBulkRequest.requests().get(++currentSlot);
         }
 
         @Override
         public boolean hasNext() {
-            return (currentSlot + 1) < bulkRequest.requests().size();
+            return (currentSlot + 1) < fastBulkRequest.requests().size();
         }
 
-        BulkRequest getBulkRequest() {
+        FastBulkRequest getFastBulkRequest() {
             if (itemResponses.isEmpty()) {
-                return bulkRequest;
+                return fastBulkRequest;
             } else {
-                BulkRequest modifiedBulkRequest = new BulkRequest();
-                modifiedBulkRequest.setRefreshPolicy(bulkRequest.getRefreshPolicy());
-                modifiedBulkRequest.waitForActiveShards(bulkRequest.waitForActiveShards());
-                modifiedBulkRequest.timeout(bulkRequest.timeout());
+                FastBulkRequest fastBulkRequest = new FastBulkRequest();
+                fastBulkRequest.setRefreshPolicy(this.fastBulkRequest.getRefreshPolicy());
+                fastBulkRequest.waitForActiveShards(this.fastBulkRequest.waitForActiveShards());
+                fastBulkRequest.timeout(this.fastBulkRequest.timeout());
 
                 int slot = 0;
-                List<DocWriteRequest<?>> requests = bulkRequest.requests();
+                List<DocWriteRequest<?>> requests = this.fastBulkRequest.requests();
                 originalSlots = new int[requests.size()]; // oversize, but that's ok
                 for (int i = 0; i < requests.size(); i++) {
                     DocWriteRequest request = requests.get(i);
                     if (failedSlots.get(i) == false) {
-                        modifiedBulkRequest.add(request);
+                        fastBulkRequest.add(request);
                         originalSlots[slot++] = i;
                     }
                 }
-                return modifiedBulkRequest;
+                return fastBulkRequest;
             }
         }
 
@@ -694,47 +731,47 @@ public class FastBulkTransportAction extends HandledTransportAction<BulkRequest,
                                 response.getTook().getMillis(), ingestTookInMillis)),
                         actionListener::onFailure);
             } else {
-                return new IngestBulkResponseListener(ingestTookInMillis, originalSlots, itemResponses, actionListener);
+                return new IngestFastBulkResponseListener(ingestTookInMillis, originalSlots, itemResponses, actionListener);
             }
         }
 
         void markCurrentItemAsDropped() {
-            IndexRequest indexRequest = getIndexWriteRequest(bulkRequest.requests().get(currentSlot));
+            FastIndexRequest fastIndexRequest = getIndexWriteRequest(fastBulkRequest.requests().get(currentSlot));
             failedSlots.set(currentSlot);
-            final String id = indexRequest.id() == null ? DROPPED_ITEM_WITH_AUTO_GENERATED_ID : indexRequest.id();
+            final String id = fastIndexRequest.id() == null ? DROPPED_ITEM_WITH_AUTO_GENERATED_ID : fastIndexRequest.id();
             itemResponses.add(
-                    new BulkItemResponse(currentSlot, indexRequest.opType(),
+                    new BulkItemResponse(currentSlot, fastIndexRequest.opType(),
                             new UpdateResponse(
-                                    new ShardId(indexRequest.index(), IndexMetaData.INDEX_UUID_NA_VALUE, 0),
-                                    indexRequest.type(), id, indexRequest.version(), DocWriteResponse.Result.NOOP
+                                    new ShardId(fastIndexRequest.index(), IndexMetaData.INDEX_UUID_NA_VALUE, 0),
+                                    fastIndexRequest.type(), id, fastIndexRequest.version(), DocWriteResponse.Result.NOOP
                             )
                     )
             );
         }
 
         void markCurrentItemAsFailed(Exception e) {
-            IndexRequest indexRequest = getIndexWriteRequest(bulkRequest.requests().get(currentSlot));
+            FastIndexRequest fastIndexRequest = getIndexWriteRequest(fastBulkRequest.requests().get(currentSlot));
             // We hit a error during preprocessing a request, so we:
             // 1) Remember the request item slot from the bulk, so that we're done processing all requests we know what failed
             // 2) Add a bulk item failure for this request
             // 3) Continue with the next request in the bulk.
             failedSlots.set(currentSlot);
-            BulkItemResponse.Failure failure = new BulkItemResponse.Failure(indexRequest.index(), indexRequest.type(),
-                    indexRequest.id(), e);
-            itemResponses.add(new BulkItemResponse(currentSlot, indexRequest.opType(), failure));
+            BulkItemResponse.Failure failure = new BulkItemResponse.Failure(fastIndexRequest.index(), fastIndexRequest.type(),
+                    fastIndexRequest.id(), e);
+            itemResponses.add(new BulkItemResponse(currentSlot, fastIndexRequest.opType(), failure));
         }
 
     }
 
-    static final class IngestBulkResponseListener implements ActionListener<BulkResponse> {
+    static final class IngestFastBulkResponseListener implements ActionListener<BulkResponse> {
 
         private final long ingestTookInMillis;
         private final int[] originalSlots;
         private final List<BulkItemResponse> itemResponses;
         private final ActionListener<BulkResponse> actionListener;
 
-        IngestBulkResponseListener(long ingestTookInMillis, int[] originalSlots, List<BulkItemResponse> itemResponses,
-                                   ActionListener<BulkResponse> actionListener) {
+        IngestFastBulkResponseListener(long ingestTookInMillis, int[] originalSlots, List<BulkItemResponse> itemResponses,
+                                       ActionListener<BulkResponse> actionListener) {
             this.ingestTookInMillis = ingestTookInMillis;
             this.itemResponses = itemResponses;
             this.actionListener = actionListener;
