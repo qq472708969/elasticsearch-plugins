@@ -27,6 +27,8 @@ import org.elasticsearch.cluster.ClusterStateObserver;
 import org.elasticsearch.cluster.block.ClusterBlockException;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.metadata.*;
+import org.elasticsearch.cluster.routing.Murmur3HashFunction;
+import org.elasticsearch.cluster.routing.RoutingTable;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
@@ -331,8 +333,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                  * shard_no不存在
                  */
                 Settings filter = settingsFilter.filter(esIndexMetaData.getSettings());
-                int slotCount = filter.getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
-                this.slotCount = slotCount;
+                this.slotCount = filter.getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
                 if (SLOT_COUNT_DEFAULT == slotCount) {
                     /**
                      * shard_no不存在，并且index中没有配置routing_slot，则始终执行向doc数量少的shard写入数据，该批量操作为同一shard
@@ -372,17 +373,30 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
         /**
          * 根据外部指定
          *
-         * @param esIndexMetaData
+         * @param routingTable
+         * @param indexName
          * @param routingNumShards
          * @param slotCount
-         * @param slotNo
+         * @param routing
          * @param id
          * @return
          */
-        private ShardId getShardId(IndexMetaData esIndexMetaData, int routingNumShards, int slotCount, String slotNo, String id) {
+        private ShardId getShardId(RoutingTable routingTable, String indexName, int routingNumShards, int slotCount, String routing, String id) {
             int slotSize = routingNumShards / slotCount;
+            String effectiveRouting;
+            if (routing == null) {
+                effectiveRouting = id;
+            } else {
+                effectiveRouting = routing;
+            }
+            int hashVal = Murmur3HashFunction.hash(effectiveRouting);
 
-            return null;
+            /**
+             * 获取槽儿位置
+             */
+            int slotNo = Math.floorMod((int) Math.random(), slotSize);
+            int shardNo = hashVal % slotSize + slotNo * slotSize;
+            return routingTable.shardRoutingTable(indexName, shardNo).shardId();
         }
 
         @Override
@@ -456,16 +470,17 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                 ShardId shardId;
                 String concreteIndex = concreteIndices.getConcreteIndex(request.index()).getName();
                 if (requestShardNo == null) {
+                    RoutingTable routingTable = clusterState.getRoutingTable();
                     /**
                      * 如果没有配置routing_slot则直接使用外部传入的es实际物理shard_no编号
                      */
                     if (SLOT_COUNT_DEFAULT == slotCount) {
-                        shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, shardNo).shardId();
+                        shardId = routingTable.shardRoutingTable(concreteIndex, shardNo).shardId();
                     } else {
                         /**
                          * 该方法用来计算依据逻辑slot，映射到的物理shard
                          */
-                        shardId = getShardId(esIndexMetaData, routingNumShards, slotCount, request.routing(), request.id());
+                        shardId = getShardId(routingTable, concreteIndex, routingNumShards, slotCount, request.routing(), request.id());
                     }
                 } else {
                     /**
@@ -474,12 +489,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                     shardId = clusterState.getRoutingTable().shardRoutingTable(concreteIndex, Integer.valueOf(requestShardNo)).shardId();
                 }
                 List<BulkItemRequest> shardRequests = requestsByShard.computeIfAbsent(shardId, shard -> new ArrayList<>());
-                BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
-                request.writeToStream(bytesStreamOutput);
-                BytesReference bytes = bytesStreamOutput.bytes();
-                StreamInput streamInput = bytes.streamInput();
-                IndexRequest indexRequest = new IndexRequest();
-                indexRequest.readFrom(streamInput);
+                IndexRequest indexRequest = newIndexRequest(request);
                 shardRequests.add(new BulkItemRequest(i, indexRequest));
             }
 
@@ -536,6 +546,16 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                     }
                 });
             }
+        }
+
+        private IndexRequest newIndexRequest(FastDocWriteRequest request) throws java.io.IOException {
+            BytesStreamOutput bytesStreamOutput = new BytesStreamOutput();
+            request.writeToStream(bytesStreamOutput);
+            BytesReference bytes = bytesStreamOutput.bytes();
+            StreamInput streamInput = bytes.streamInput();
+            IndexRequest indexRequest = new IndexRequest();
+            indexRequest.readFrom(streamInput);
+            return indexRequest;
         }
 
         private boolean handleBlockExceptions(ClusterState state) {
