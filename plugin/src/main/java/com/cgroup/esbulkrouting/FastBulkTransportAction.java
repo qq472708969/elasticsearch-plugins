@@ -527,8 +527,9 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
          *
          * @param routingTable
          * @param indexName
-         * @param routing
-         * @param id
+         * @param slotSize 每个槽位对应物理shard个数
+         * @param routing doc原生_routing属性
+         * @param id doc的原生_id属性
          * @return
          */
         private ShardId getShardId(RoutingTable routingTable, String indexName, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
