@@ -52,6 +52,8 @@ import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
 
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -304,8 +306,8 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
         private IndexMetaData esIndexMetaData;
         private int shardNo;
         private int slotCount;
+        private int slotSize;
         private int SLOT_COUNT_DEFAULT = -1;
-        private int routingNumShards;
 
         FastBulkOperation(Task task, FastBulkRequest fastBulkRequest, ActionListener<BulkResponse> listener, AtomicArray<BulkItemResponse> responses,
                           long startTimeNanos, Map<String, IndexNotFoundException> indicesThatCannotBeCreated) {
@@ -327,7 +329,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             String requestShardNo = fastIndexRequest.shardNo();
             String indexName = fastIndexRequest.index();
             this.esIndexMetaData = clusterService.state().metaData().index(indexName);
-            this.routingNumShards = esIndexMetaData.getRoutingNumShards();
+            int routingNumShards = esIndexMetaData.getRoutingNumShards();
             if (requestShardNo == null) {
                 /**
                  * shard_no不存在
@@ -340,6 +342,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                      */
                     littleHighPriority(indexName, esIndexMetaData, routingNumShards);
                 } else {
+                    this.slotSize = routingNumShards / slotCount;
                     logger.info("=====索引设置了slot数量:{}", slotCount);
                 }
             } else {
@@ -371,18 +374,15 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
         }
 
         /**
-         * 根据外部指定
+         * 计算逻辑slot对应的物理shard
          *
          * @param routingTable
          * @param indexName
-         * @param routingNumShards
-         * @param slotCount
          * @param routing
          * @param id
          * @return
          */
-        private ShardId getShardId(RoutingTable routingTable, String indexName, int routingNumShards, int slotCount, String routing, String id) {
-            int slotSize = routingNumShards / slotCount;
+        private ShardId getShardId(RoutingTable routingTable, String indexName, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
             String effectiveRouting;
             if (routing == null) {
                 effectiveRouting = id;
@@ -394,9 +394,14 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             /**
              * 获取槽儿位置
              */
-            int slotNo = Math.floorMod((int) Math.random(), slotSize);
-            int shardNo = hashVal % slotSize + slotNo * slotSize;
+            int slotNo = Math.floorMod(hashVal, slotSize);
+            int shardNo = Math.floorMod(getRandomNo(), slotSize) + slotNo * slotSize;
+            logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, shardNo);
             return routingTable.shardRoutingTable(indexName, shardNo).shardId();
+        }
+
+        private int getRandomNo() throws NoSuchAlgorithmException {
+            return SecureRandom.getInstanceStrong().nextInt(100);
         }
 
         @Override
@@ -480,7 +485,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                         /**
                          * 该方法用来计算依据逻辑slot，映射到的物理shard
                          */
-                        shardId = getShardId(routingTable, concreteIndex, routingNumShards, slotCount, request.routing(), request.id());
+                        shardId = getShardId(routingTable, concreteIndex, slotSize, request.routing(), request.id());
                     }
                 } else {
                     /**

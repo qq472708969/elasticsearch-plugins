@@ -151,12 +151,6 @@ public class FastBulkRestHandler extends BaseRestHandler {
     }
 
     private void paramsCheck(RestRequest request) {
-        //废除routing参数，改用shard_id参数
-        //String defaultRouting = request.param("routing");
-        //if (defaultRouting != null) {
-        //    throw new RuntimeException(
-        //            "_fast_bulk接口已经废弃了routing参数，支持显示直接传递shard_no（分片id编号）; shard_no必须为非负整数；\n 并且使用_fast_bulk后，索引查询也不能使用routing参数");
-        //}
         String shardNo = request.param("shard_no");
         if (shardNo != null) {
             Integer.valueOf(shardNo);
