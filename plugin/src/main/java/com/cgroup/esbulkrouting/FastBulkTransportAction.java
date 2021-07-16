@@ -318,10 +318,10 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             this.startTimeNanos = startTimeNanos;
             this.indicesThatCannotBeCreated = indicesThatCannotBeCreated;
             this.observer = new ClusterStateObserver(clusterService, fastBulkRequest.timeout(), logger, threadPool.getThreadContext());
-            buildShardNo(fastBulkRequest);
+            buildBasicInfo(fastBulkRequest);
         }
 
-        private void buildShardNo(FastBulkRequest fastBulkRequest) {
+        private void buildBasicInfo(FastBulkRequest fastBulkRequest) {
             /**
              * doc中已经禁用了这个参数，如果url中指定了shard_no，则写入数据列表中每条数据的shardNo编号是同一个；
              */
