@@ -321,89 +321,6 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             buildBasicInfo(fastBulkRequest);
         }
 
-        private void buildBasicInfo(FastBulkRequest fastBulkRequest) {
-            /**
-             * doc中已经禁用了这个参数，如果url中指定了shard_no，则写入数据列表中每条数据的shardNo编号是同一个；
-             */
-            FastIndexRequest fastIndexRequest = (FastIndexRequest) fastBulkRequest.requests().get(0);
-            String requestShardNo = fastIndexRequest.shardNo();
-            String indexName = fastIndexRequest.index();
-            this.esIndexMetaData = clusterService.state().metaData().index(indexName);
-            int routingNumShards = esIndexMetaData.getRoutingNumShards();
-            if (requestShardNo == null) {
-                /**
-                 * shard_no不存在
-                 */
-                Settings filter = settingsFilter.filter(esIndexMetaData.getSettings());
-                this.slotCount = filter.getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
-                if (SLOT_COUNT_DEFAULT == slotCount) {
-                    /**
-                     * shard_no不存在，并且index中没有配置routing_slot，则始终执行向doc数量少的shard写入数据，该批量操作为同一shard
-                     */
-                    littleHighPriority(indexName, esIndexMetaData, routingNumShards);
-                } else {
-                    this.slotSize = routingNumShards / slotCount;
-                    logger.info("=====索引设置了slot数量:{}", slotCount);
-                }
-            } else {
-                /**
-                 * 只要url中指定了shard_no编号参数，则本次批量写入操作均指向该shard
-                 */
-                logger.info("=====使用外部参数指定的物理shard编号:{}", requestShardNo);
-            }
-        }
-
-        private void littleHighPriority(String indexName, IndexMetaData esIndexMetaData, int routingNumShards) {
-            String indexUUID = esIndexMetaData.getIndexUUID();
-            logger.info("=====routingNumShards:{}", routingNumShards);
-            long minCount = Long.MAX_VALUE;
-            for (int i = 0; i < routingNumShards; i++) {
-                ShardId shardId = new ShardId(indexName, indexUUID, i);
-                long count = indexServices.getShardOrNull(shardId).docStats().getCount();
-                if (count < minCount) {
-                    minCount = count;
-                    shardNo = i;
-                }
-            }
-            logger.info("=====fast_bulk自动计算shard编号:{}", shardNo);
-        }
-
-        @Override
-        public void onFailure(Exception e) {
-            listener.onFailure(e);
-        }
-
-        /**
-         * 计算逻辑slot对应的物理shard
-         *
-         * @param routingTable
-         * @param indexName
-         * @param routing
-         * @param id
-         * @return
-         */
-        private ShardId getShardId(RoutingTable routingTable, String indexName, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
-            String effectiveRouting;
-            if (routing == null) {
-                effectiveRouting = id;
-            } else {
-                effectiveRouting = routing;
-            }
-            int hashVal = Murmur3HashFunction.hash(effectiveRouting);
-
-            /**
-             * 获取槽儿位置
-             */
-            int slotNo = Math.floorMod(hashVal, slotSize);
-            int shardNo = Math.floorMod(getRandomNo(), slotSize) + slotNo * slotSize;
-            logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, shardNo);
-            return routingTable.shardRoutingTable(indexName, shardNo).shardId();
-        }
-
-        private int getRandomNo() throws NoSuchAlgorithmException {
-            return SecureRandom.getInstanceStrong().nextInt(100);
-        }
-
         @Override
         protected void doRun() throws Exception {
             final ClusterState clusterState = observer.setAndGetObservedState();
@@ -551,6 +468,89 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                     }
                 });
             }
+        }
+
+        private void buildBasicInfo(FastBulkRequest fastBulkRequest) {
+            /**
+             * doc中已经禁用了这个参数，如果url中指定了shard_no，则写入数据列表中每条数据的shardNo编号是同一个；
+             */
+            FastIndexRequest fastIndexRequest = (FastIndexRequest) fastBulkRequest.requests().get(0);
+            String requestShardNo = fastIndexRequest.shardNo();
+            String indexName = fastIndexRequest.index();
+            this.esIndexMetaData = clusterService.state().metaData().index(indexName);
+            int routingNumShards = esIndexMetaData.getRoutingNumShards();
+            if (requestShardNo == null) {
+                /**
+                 * shard_no不存在
+                 */
+                Settings filter = settingsFilter.filter(esIndexMetaData.getSettings());
+                this.slotCount = filter.getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
+                if (SLOT_COUNT_DEFAULT == slotCount) {
+                    /**
+                     * shard_no不存在，并且index中没有配置routing_slot，则始终执行向doc数量少的shard写入数据，该批量操作为同一shard
+                     */
+                    littleHighPriority(indexName, esIndexMetaData, routingNumShards);
+                } else {
+                    this.slotSize = routingNumShards / slotCount;
+                    logger.info("=====索引设置了slot数量:{}", slotCount);
+                }
+            } else {
+                /**
+                 * 只要url中指定了shard_no编号参数，则本次批量写入操作均指向该shard
+                 */
+                logger.info("=====使用外部参数指定的物理shard编号:{}", requestShardNo);
+            }
+        }
+
+        private void littleHighPriority(String indexName, IndexMetaData esIndexMetaData, int routingNumShards) {
+            String indexUUID = esIndexMetaData.getIndexUUID();
+            logger.info("=====routingNumShards:{}", routingNumShards);
+            long minCount = Long.MAX_VALUE;
+            for (int i = 0; i < routingNumShards; i++) {
+                ShardId shardId = new ShardId(indexName, indexUUID, i);
+                long count = indexServices.getShardOrNull(shardId).docStats().getCount();
+                if (count < minCount) {
+                    minCount = count;
+                    shardNo = i;
+                }
+            }
+            logger.info("=====fast_bulk自动计算shard编号:{}", shardNo);
+        }
+
+        @Override
+        public void onFailure(Exception e) {
+            listener.onFailure(e);
+        }
+
+        /**
+         * 计算逻辑slot对应的物理shard
+         *
+         * @param routingTable
+         * @param indexName
+         * @param routing
+         * @param id
+         * @return
+         */
+        private ShardId getShardId(RoutingTable routingTable, String indexName, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
+            String effectiveRouting;
+            if (routing == null) {
+                effectiveRouting = id;
+            } else {
+                effectiveRouting = routing;
+            }
+            int hashVal = Murmur3HashFunction.hash(effectiveRouting);
+
+            /**
+             * 获取槽儿位置
+             */
+            int slotNo = Math.floorMod(hashVal, slotSize);
+            int shardNo = Math.floorMod(getRandomNo(), slotSize) + slotNo * slotSize;
+            logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, shardNo);
+            return routingTable.shardRoutingTable(indexName, shardNo).shardId();
+        }
+
+        private int getRandomNo() throws NoSuchAlgorithmException {
+            return SecureRandom.getInstanceStrong().nextInt(100);
         }
 
         private IndexRequest newIndexRequest(FastDocWriteRequest request) throws java.io.IOException {

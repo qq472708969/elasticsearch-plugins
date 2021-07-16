@@ -14,7 +14,6 @@ public interface FastDocWriteRequest<T> extends DocWriteRequest<T> {
 
     String shardNo();
 
-
     void writeToStream(StreamOutput out) throws IOException;
 
     void readFromStream(StreamInput in) throws IOException;
