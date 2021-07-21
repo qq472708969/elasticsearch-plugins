@@ -654,7 +654,7 @@ public class SlotSearchPhaseController {
         }
 
         @Override
-        public ReducedQueryPhase reduce() {
+        public SlotSearchPhaseController.ReducedQueryPhase reduce() {
             return controller.reducedQueryPhase(results.asList(), getRemainingAggs(), getRemainingTopDocs(), topDocsStats,
                     numReducePhases, false, performFinalReduce);
         }
