@@ -88,9 +88,9 @@ interface SearchPhaseContext extends ActionListener<SlotSearchResponse>, Executo
     Transport.Connection getConnection(String clusterAlias, String nodeId);
 
     /**
-     * Returns the {@link SearchTransportService} to send shard request to other nodes
+     * Returns the {@link SlotSearchTransportService} to send shard request to other nodes
      */
-    SearchTransportService getSearchTransport();
+    SlotSearchTransportService getSearchTransport();
 
     /**
      * Releases a search context with the given context ID on the node the given connection is connected to.

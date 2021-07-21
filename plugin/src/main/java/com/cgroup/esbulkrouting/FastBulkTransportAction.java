@@ -303,7 +303,6 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
         private final long startTimeNanos;
         private final ClusterStateObserver observer;
         private final Map<String, IndexNotFoundException> indicesThatCannotBeCreated;
-        private IndexMetaData esIndexMetaData;
         private int shardNo;
         private int slotCount;
         private int slotSize;
@@ -402,7 +401,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                         /**
                          * 该方法用来计算依据逻辑slot，映射到的物理shard
                          */
-                        shardId = getShardId(routingTable, concreteIndex, slotSize, request.routing(), request.id());
+                        shardId = getShardId(routingTable, concreteIndex, slotCount, slotSize, request.routing(), request.id());
                     }
                 } else {
                     /**
@@ -477,14 +476,13 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             FastIndexRequest fastIndexRequest = (FastIndexRequest) fastBulkRequest.requests().get(0);
             String requestShardNo = fastIndexRequest.shardNo();
             String indexName = fastIndexRequest.index();
-            this.esIndexMetaData = clusterService.state().metaData().index(indexName);
+            IndexMetaData esIndexMetaData = clusterService.state().metaData().index(indexName);
             int routingNumShards = esIndexMetaData.getRoutingNumShards();
             if (requestShardNo == null) {
                 /**
                  * shard_no不存在
                  */
-                Settings filter = settingsFilter.filter(esIndexMetaData.getSettings());
-                this.slotCount = filter.getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
+                this.slotCount = esIndexMetaData.getSettings().getAsInt(SETTING_ROUTING_SLOT, SLOT_COUNT_DEFAULT);
                 if (SLOT_COUNT_DEFAULT == slotCount) {
                     /**
                      * shard_no不存在，并且index中没有配置routing_slot，则始终执行向doc数量少的shard写入数据，该批量操作为同一shard
@@ -527,12 +525,12 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
          *
          * @param routingTable
          * @param indexName
-         * @param slotSize 每个槽位对应物理shard个数
-         * @param routing doc原生_routing属性
-         * @param id doc的原生_id属性
+         * @param slotSize     每个槽位对应物理shard个数
+         * @param routing      doc原生_routing属性
+         * @param id           doc的原生_id属性
          * @return
          */
-        private ShardId getShardId(RoutingTable routingTable, String indexName, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
+        private ShardId getShardId(RoutingTable routingTable, String indexName, int slotCount, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
             String effectiveRouting;
             if (routing == null) {
                 effectiveRouting = id;
@@ -544,7 +542,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             /**
              * 获取槽儿位置
              */
-            int slotNo = Math.floorMod(hashVal, slotSize);
+            int slotNo = Math.floorMod(hashVal, slotCount);
             int shardNo = Math.floorMod(getRandomNo(), slotSize) + slotNo * slotSize;
             logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, shardNo);
             return routingTable.shardRoutingTable(indexName, shardNo).shardId();

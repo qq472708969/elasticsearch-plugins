@@ -57,10 +57,10 @@ public class MultiSearchRequest extends ActionRequest implements CompositeIndice
      * Add a search request to execute. Note, the order is important, the search response will be returned in the
      * same order as the search requests.
      */
-//    public MultiSearchRequest add(SlotSearchRequestBuilder request) {
-//        requests.add(request.request());
-//        return this;
-//    }
+    public MultiSearchRequest add(SlotSearchRequestBuilder request) {
+        requests.add(request.request());
+        return this;
+    }
 
     /**
      * Add a search request to execute. Note, the order is important, the search response will be returned in the

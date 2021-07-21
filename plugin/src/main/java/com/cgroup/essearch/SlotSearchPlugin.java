@@ -32,8 +32,8 @@ public class SlotSearchPlugin extends Plugin implements ActionPlugin {
      * @return
      */
     @Override
-    public List<ActionPlugin.ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
-        return Arrays.asList(new ActionPlugin.ActionHandler<>(SlotSearchAction.INSTANCE, SlotSearchTransportAction.class));
+    public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
+        return Arrays.asList(new ActionHandler<>(SlotSearchAction.INSTANCE, SlotSearchTransportAction.class));
     }
 
     public SlotSearchPlugin() {

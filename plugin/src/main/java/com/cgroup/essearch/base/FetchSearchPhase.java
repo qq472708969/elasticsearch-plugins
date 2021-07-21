@@ -44,7 +44,7 @@ import java.util.function.BiFunction;
  */
 public final class FetchSearchPhase extends SearchPhase {
     private final AtomicArray<FetchSearchResult> fetchResults;
-    private final SearchPhaseController searchPhaseController;
+    private final SlotSearchPhaseController searchPhaseController;
     private final AtomicArray<SearchPhaseResult> queryResults;
     private final BiFunction<InternalSearchResponse, String, SearchPhase> nextPhaseFactory;
     private final SearchPhaseContext context;
@@ -52,7 +52,7 @@ public final class FetchSearchPhase extends SearchPhase {
     private final InitialSearchPhase.SearchPhaseResults<SearchPhaseResult> resultConsumer;
 
    public FetchSearchPhase(InitialSearchPhase.SearchPhaseResults<SearchPhaseResult> resultConsumer,
-                     SearchPhaseController searchPhaseController,
+                     SlotSearchPhaseController searchPhaseController,
                      SearchPhaseContext context) {
         this(resultConsumer, searchPhaseController, context,
             (response, scrollId) -> new ExpandSearchPhase(context, response,
@@ -61,7 +61,7 @@ public final class FetchSearchPhase extends SearchPhase {
     }
 
     FetchSearchPhase(InitialSearchPhase.SearchPhaseResults<SearchPhaseResult> resultConsumer,
-                     SearchPhaseController searchPhaseController,
+                     SlotSearchPhaseController searchPhaseController,
                      SearchPhaseContext context, BiFunction<InternalSearchResponse, String, SearchPhase> nextPhaseFactory) {
         super("fetch");
         if (context.getNumShards() != resultConsumer.getNumShards()) {
@@ -100,7 +100,7 @@ public final class FetchSearchPhase extends SearchPhase {
         final boolean isScrollSearch = context.getRequest().scroll() != null;
         List<SearchPhaseResult> phaseResults = queryResults.asList();
         String scrollId = isScrollSearch ? TransportSearchHelper.buildScrollId(queryResults) : null;
-        final SearchPhaseController.ReducedQueryPhase reducedQueryPhase = resultConsumer.reduce();
+        final SlotSearchPhaseController.ReducedQueryPhase reducedQueryPhase = resultConsumer.reduce();
         final boolean queryAndFetchOptimization = queryResults.length() == 1;
         final Runnable finishPhase = ()
             -> moveToNextPhase(searchPhaseController, scrollId, reducedQueryPhase, queryAndFetchOptimization ?
@@ -204,8 +204,8 @@ public final class FetchSearchPhase extends SearchPhase {
         }
     }
 
-    private void moveToNextPhase(SearchPhaseController searchPhaseController,
-                                 String scrollId, SearchPhaseController.ReducedQueryPhase reducedQueryPhase,
+    private void moveToNextPhase(SlotSearchPhaseController searchPhaseController,
+                                 String scrollId, SlotSearchPhaseController.ReducedQueryPhase reducedQueryPhase,
                                  AtomicArray<? extends SearchPhaseResult> fetchResultsArr) {
         final InternalSearchResponse internalResponse = searchPhaseController.merge(context.getRequest().scroll() != null,
             reducedQueryPhase, fetchResultsArr.asList(), fetchResultsArr::get);

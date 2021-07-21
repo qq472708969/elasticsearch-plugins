@@ -50,8 +50,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.LongSupplier;
 
+import static com.cgroup.esbulkrouting.FastBulkAction.SETTING_ROUTING_SLOT;
 import static org.elasticsearch.action.search.SearchType.QUERY_THEN_FETCH;
-import static org.elasticsearch.cluster.metadata.IndexNameExpressionResolver.isAllIndices;
 
 /**
  * Created by zzq on 2021/7/20.
@@ -64,23 +64,25 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
             "action.search.shard_count.limit", Long.MAX_VALUE, 1L, Setting.Property.Dynamic, Setting.Property.NodeScope);
 
     private final ClusterService clusterService;
-    private final SearchTransportService searchTransportService;
+    private final SlotSearchTransportService searchTransportService;
     private final RemoteClusterService remoteClusterService;
-    private final SearchPhaseController searchPhaseController;
+    private final SlotSearchPhaseController searchPhaseController;
     private final SearchService searchService;
+    private final SlotOperationRouting slotOperationRouting;
 
     @Inject
     public SlotSearchTransportAction(Settings settings, ThreadPool threadPool, TransportService transportService, SearchService searchService,
-                                     SearchTransportService searchTransportService, SearchPhaseController searchPhaseController,
+                                     SlotSearchTransportService searchTransportService, SlotSearchPhaseController searchPhaseController,
                                      ClusterService clusterService, ActionFilters actionFilters,
                                      IndexNameExpressionResolver indexNameExpressionResolver) {
         super(settings, SlotSearchAction.NAME, threadPool, transportService, actionFilters, indexNameExpressionResolver, SlotSearchRequest::new);
         this.searchPhaseController = searchPhaseController;
         this.searchTransportService = searchTransportService;
         this.remoteClusterService = searchTransportService.getRemoteClusterService();
-        SearchTransportService.registerRequestHandler(transportService, searchService);
+        SlotSearchTransportService.registerRequestHandler(transportService, searchService);
         this.clusterService = clusterService;
         this.searchService = searchService;
+        this.slotOperationRouting = new SlotOperationRouting(settings, clusterService.getClusterSettings());
     }
 
     private Map<String, AliasFilter> buildPerIndexAliasFilter(SlotSearchRequest request, ClusterState clusterState,
@@ -174,8 +176,8 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
     @Override
     protected void doExecute(Task task, SlotSearchRequest searchRequest, ActionListener<SlotSearchResponse> listener) {
         final long relativeStartNanos = System.nanoTime();
-        final SlotSearchTransportAction.SearchTimeProvider timeProvider =
-                new SlotSearchTransportAction.SearchTimeProvider(searchRequest.getOrCreateAbsoluteStartMillis(), relativeStartNanos, System::nanoTime);
+        final SearchTimeProvider timeProvider =
+                new SearchTimeProvider(searchRequest.getOrCreateAbsoluteStartMillis(), relativeStartNanos, System::nanoTime);
         ActionListener<SearchSourceBuilder> rewriteListener = ActionListener.wrap(source -> {
             if (source != searchRequest.source()) {
                 // only set it if it changed - we don't allow null values to be set but it might be already null be we want to catch
@@ -277,7 +279,7 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
     private Index[] resolveLocalIndices(OriginalIndices localIndices,
                                         IndicesOptions indicesOptions,
                                         ClusterState clusterState,
-                                        SlotSearchTransportAction.SearchTimeProvider timeProvider) {
+                                        SearchTimeProvider timeProvider) {
         if (localIndices == null) {
             return Index.EMPTY_ARRAY; //don't search on any local index (happens when only remote indices were specified)
         }
@@ -285,12 +287,11 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
                 timeProvider.getAbsoluteStartMillis(), localIndices.indices());
     }
 
-    private void executeSearch(SearchTask task, SlotSearchTransportAction.SearchTimeProvider timeProvider, SlotSearchRequest searchRequest,
+    private void executeSearch(SearchTask task, SearchTimeProvider timeProvider, SlotSearchRequest searchRequest,
                                OriginalIndices localIndices, List<SearchShardIterator> remoteShardIterators,
                                BiFunction<String, String, DiscoveryNode> remoteConnections, ClusterState clusterState,
                                Map<String, AliasFilter> remoteAliasMap, ActionListener<SlotSearchResponse> listener, int nodeCount,
-                               SlotSearchResponse.Clusters clusters)
-            throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, NoSuchFieldException, InstantiationException, IllegalAccessException {
+                               SlotSearchResponse.Clusters clusters) {
 
         clusterState.blocks().globalBlockedRaiseException(ClusterBlockLevel.READ);
         // TODO: I think startTime() should become part of ActionRequest and that should be used both for index name
@@ -298,14 +299,15 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
         // of just for the _search api
         final Index[] indices = resolveLocalIndices(localIndices, searchRequest.indicesOptions(), clusterState, timeProvider);
         Map<String, AliasFilter> aliasFilter = buildPerIndexAliasFilter(searchRequest, clusterState, indices, remoteAliasMap);
-        Map<String, Set<String>> routingMap = resolveSearchRouting(clusterState, searchRequest.routing(), searchRequest.indices());
+        Map<String, Set<String>> routingMap = indexNameExpressionResolver.resolveSearchRouting(clusterState, searchRequest.routing(), searchRequest.indices());
         routingMap = routingMap == null ? Collections.emptyMap() : Collections.unmodifiableMap(routingMap);
         String[] concreteIndices = new String[indices.length];
         for (int i = 0; i < indices.length; i++) {
             concreteIndices[i] = indices[i].getName();
         }
         Map<String, Long> nodeSearchCounts = searchTransportService.getPendingSearchRequests();
-        GroupShardsIterator<ShardIterator> localShardsIterator = clusterService.operationRouting().searchShards(clusterState,
+
+        GroupShardsIterator<ShardIterator> localShardsIterator = slotOperationRouting.searchShards(clusterState,
                 concreteIndices, routingMap, searchRequest.preference(), searchService.getResponseCollectorService(), nodeSearchCounts);
         GroupShardsIterator<SearchShardIterator> shardIterators = mergeShardsIterators(localShardsIterator, localIndices,
                 searchRequest.getLocalClusterAlias(), remoteShardIterators);
@@ -344,13 +346,30 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
                 Collections.unmodifiableMap(aliasFilter), concreteIndexBoosts, routingMap, listener, preFilterSearchShards, clusters).start();
     }
 
+    /**
+     * 废弃的方法，这里不需要重新构建routing参数
+     *
+     * @param state
+     * @param routing
+     * @param expressions
+     * @return
+     * @throws ClassNotFoundException
+     * @throws NoSuchMethodException
+     * @throws IllegalAccessException
+     * @throws InvocationTargetException
+     * @throws InstantiationException
+     * @throws NoSuchFieldException
+     */
+    @Deprecated
     private Map<String, Set<String>> resolveSearchRouting(ClusterState state, String routing, String[] expressions)
             throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException, NoSuchFieldException {
         List<String> resolvedExpressions = expressions != null ? Arrays.asList(expressions) : Collections.emptyList();
 
-        String className = "org.elasticsearch.cluster.metadata.IndexNameExpressionResolver.Context";
-        Class<?> contextClass = Class.forName(className);
-        Constructor<?> contextClassConstructor = contextClass.getConstructor(ClusterState.class, IndicesOptions.class);
+        String className = "org.elasticsearch.cluster.metadata.IndexNameExpressionResolver";
+        Class<?> indexNameExpressionResolverClass = Class.forName(className);
+        Class<?> contextClass = indexNameExpressionResolverClass.getDeclaredClasses()[3];
+        Constructor<?> contextClassConstructor = contextClass.getDeclaredConstructor(ClusterState.class, IndicesOptions.class);
+
         Object contextObj = contextClassConstructor.newInstance(state, IndicesOptions.lenientExpandOpen());
 
         Field expressionResolversField = indexNameExpressionResolver.getClass().getDeclaredField("expressionResolvers");
@@ -362,12 +381,6 @@ public class SlotSearchTransportAction extends HandledTransportAction<SlotSearch
             Object resolveObj = resolveMethod.invoke(expressionResolverItem, contextObj, resolvedExpressions);
             resolvedExpressions = (List<String>) resolveObj;
         }
-
-//        IndexNameExpressionResolver.Context context = new IndexNameExpressionResolver.Context(state, IndicesOptions.lenientExpandOpen());
-//        for (IndexNameExpressionResolver.ExpressionResolver expressionResolver : expressionResolvers) {
-//            resolvedExpressions = expressionResolver.resolve(context, resolvedExpressions);
-//        }
-
 
         Map<String, Set<String>> routings = null;
         Set<String> paramRouting = null;

@@ -41,14 +41,14 @@ import java.util.function.Function;
  */
 final class DfsQueryPhase extends SearchPhase {
     private final InitialSearchPhase.ArraySearchPhaseResults<SearchPhaseResult> queryResult;
-    private final SearchPhaseController searchPhaseController;
+    private final SlotSearchPhaseController searchPhaseController;
     private final AtomicArray<DfsSearchResult> dfsSearchResults;
     private final Function<InitialSearchPhase.ArraySearchPhaseResults<SearchPhaseResult>, SearchPhase> nextPhaseFactory;
     private final SearchPhaseContext context;
-    private final SearchTransportService searchTransportService;
+    private final SlotSearchTransportService searchTransportService;
 
     DfsQueryPhase(AtomicArray<DfsSearchResult> dfsSearchResults,
-                  SearchPhaseController searchPhaseController,
+                  SlotSearchPhaseController searchPhaseController,
                   Function<InitialSearchPhase.ArraySearchPhaseResults<SearchPhaseResult>, SearchPhase> nextPhaseFactory,
                   SearchPhaseContext context) {
         super("dfs_query");

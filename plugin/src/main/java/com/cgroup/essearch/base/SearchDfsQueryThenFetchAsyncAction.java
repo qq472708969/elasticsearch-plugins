@@ -38,12 +38,12 @@ import java.util.function.BiFunction;
 
 public final class SearchDfsQueryThenFetchAsyncAction extends AbstractSearchAsyncAction<DfsSearchResult> {
 
-    private final SearchPhaseController searchPhaseController;
+    private final SlotSearchPhaseController searchPhaseController;
 
-    public SearchDfsQueryThenFetchAsyncAction(final Logger logger, final SearchTransportService searchTransportService,
+    public SearchDfsQueryThenFetchAsyncAction(final Logger logger, final SlotSearchTransportService searchTransportService,
                                               final BiFunction<String, String, Transport.Connection> nodeIdToConnection, final Map<String, AliasFilter> aliasFilter,
                                               final Map<String, Float> concreteIndexBoosts, final Map<String, Set<String>> indexRoutings,
-                                              final SearchPhaseController searchPhaseController, final Executor executor,
+                                              final SlotSearchPhaseController searchPhaseController, final Executor executor,
                                               final SlotSearchRequest request, final ActionListener<SlotSearchResponse> listener,
                                               final GroupShardsIterator<SearchShardIterator> shardsIts, final SlotSearchTransportAction.SearchTimeProvider timeProvider,
                                               final long clusterStateVersion, final SearchTask task, SlotSearchResponse.Clusters clusters) {

@@ -193,7 +193,7 @@ public class MultiSearchResponse extends ActionResponse implements Iterable<Mult
         return PARSER.apply(parser, null);
     }
 
-    private static MultiSearchResponse.Item itemFromXContent(XContentParser parser) throws IOException {
+    private static Item itemFromXContent(XContentParser parser) throws IOException {
         // This parsing logic is a bit tricky here, because the multi search response itself is tricky:
         // 1) The json objects inside the responses array are either a search response or a serialized exception
         // 2) Each response json object gets a status field injected that ElasticsearchException.failureFromXContent(...) does not parse,

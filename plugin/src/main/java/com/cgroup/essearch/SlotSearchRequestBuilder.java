@@ -50,7 +50,7 @@ public class SlotSearchRequestBuilder extends ActionRequestBuilder<SlotSearchReq
     }
 
     /**
-     * The search type to execute, defaults to {@link org.elasticsearch.action.search.SearchType#DEFAULT}.
+     * The search type to execute, defaults to {@link SearchType#DEFAULT}.
      */
     public SlotSearchRequestBuilder setSearchType(SearchType searchType) {
         request.searchType(searchType);
@@ -416,7 +416,7 @@ public class SlotSearchRequestBuilder extends ActionRequestBuilder<SlotSearchReq
 
     /**
      * Clears all rescorers on the builder and sets the first one.  To use multiple rescore windows use
-     * {@link #addRescorer(org.elasticsearch.search.rescore.RescorerBuilder, int)}.
+     * {@link #addRescorer(RescorerBuilder, int)}.
      *
      * @param rescorer rescorer configuration
      * @return this for chaining
@@ -428,7 +428,7 @@ public class SlotSearchRequestBuilder extends ActionRequestBuilder<SlotSearchReq
 
     /**
      * Clears all rescorers on the builder and sets the first one.  To use multiple rescore windows use
-     * {@link #addRescorer(org.elasticsearch.search.rescore.RescorerBuilder, int)}.
+     * {@link #addRescorer(RescorerBuilder, int)}.
      *
      * @param rescorer rescorer configuration
      * @param window   rescore window

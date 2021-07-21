@@ -57,7 +57,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
 
     private ShardSearchFailure[] shardFailures;
 
-    private SlotSearchResponse.Clusters clusters;
+    private Clusters clusters;
 
     private long tookInMillis;
 
@@ -65,7 +65,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
     }
 
     public SlotSearchResponse(SearchResponseSections internalResponse, String scrollId, int totalShards, int successfulShards,
-                          int skippedShards, long tookInMillis, ShardSearchFailure[] shardFailures, SlotSearchResponse.Clusters clusters) {
+                          int skippedShards, long tookInMillis, ShardSearchFailure[] shardFailures, Clusters clusters) {
         this.internalResponse = internalResponse;
         this.scrollId = scrollId;
         this.clusters = clusters;
@@ -191,9 +191,9 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
     /**
      * Returns info about what clusters the search was executed against. Available only in responses obtained
      * from a Cross Cluster Search request, otherwise <code>null</code>
-     * @see SlotSearchResponse.Clusters
+     * @see Clusters
      */
-    public SlotSearchResponse.Clusters getClusters() {
+    public Clusters getClusters() {
         return clusters;
     }
 
@@ -246,7 +246,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
         int skippedShards = 0; // 0 for BWC
         String scrollId = null;
         List<ShardSearchFailure> failures = new ArrayList<>();
-        SlotSearchResponse.Clusters clusters = SlotSearchResponse.Clusters.EMPTY;
+        Clusters clusters = Clusters.EMPTY;
         for (XContentParser.Token token = parser.nextToken(); token != XContentParser.Token.END_OBJECT; token = parser.nextToken()) {
             if (token == XContentParser.Token.FIELD_NAME) {
                 currentFieldName = parser.currentName();
@@ -301,7 +301,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
                             parser.skipChildren();
                         }
                     }
-                } else if (SlotSearchResponse.Clusters._CLUSTERS_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
+                } else if (Clusters._CLUSTERS_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                     int successful = -1;
                     int total = -1;
                     int skipped = -1;
@@ -309,11 +309,11 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
                         if (token == XContentParser.Token.FIELD_NAME) {
                             currentFieldName = parser.currentName();
                         } else if (token.isValue()) {
-                            if (SlotSearchResponse.Clusters.SUCCESSFUL_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
+                            if (Clusters.SUCCESSFUL_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                                 successful = parser.intValue();
-                            } else if (SlotSearchResponse.Clusters.TOTAL_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
+                            } else if (Clusters.TOTAL_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                                 total = parser.intValue();
-                            } else if (SlotSearchResponse.Clusters.SKIPPED_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
+                            } else if (Clusters.SKIPPED_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                                 skipped = parser.intValue();
                             } else {
                                 parser.skipChildren();
@@ -322,7 +322,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
                             parser.skipChildren();
                         }
                     }
-                    clusters = new SlotSearchResponse.Clusters(total, successful, skipped);
+                    clusters = new Clusters(total, successful, skipped);
                 } else {
                     parser.skipChildren();
                 }
@@ -350,9 +350,9 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
             }
         }
         if (in.getVersion().onOrAfter(Version.V_6_1_0)) {
-            clusters = new SlotSearchResponse.Clusters(in);
+            clusters = new Clusters(in);
         } else {
-            clusters = SlotSearchResponse.Clusters.EMPTY;
+            clusters = Clusters.EMPTY;
         }
         scrollId = in.readOptionalString();
         tookInMillis = in.readVLong();
@@ -393,7 +393,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
      */
     public static class Clusters implements ToXContent, Writeable {
 
-        public static final SlotSearchResponse.Clusters EMPTY = new SlotSearchResponse.Clusters(0, 0, 0);
+        public static final Clusters EMPTY = new Clusters(0, 0, 0);
 
         static final ParseField _CLUSTERS_FIELD = new ParseField("_clusters");
         static final ParseField SUCCESSFUL_FIELD = new ParseField("successful");
@@ -468,7 +468,7 @@ public class SlotSearchResponse extends ActionResponse implements StatusToXConte
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            SlotSearchResponse.Clusters clusters = (SlotSearchResponse.Clusters) o;
+            Clusters clusters = (Clusters) o;
             return total == clusters.total &&
                     successful == clusters.successful &&
                     skipped == clusters.skipped;
