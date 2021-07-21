@@ -43,6 +43,7 @@ import org.elasticsearch.index.Index;
 import org.elasticsearch.index.IndexNotFoundException;
 import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.VersionType;
+import org.elasticsearch.index.shard.IndexShard;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.indices.IndexClosedException;
 import org.elasticsearch.indices.IndicesService;
@@ -506,7 +507,14 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             long minCount = Long.MAX_VALUE;
             for (int i = 0; i < routingNumShards; i++) {
                 ShardId shardId = new ShardId(indexName, indexUUID, i);
-                long count = indexServices.getShardOrNull(shardId).docStats().getCount();
+                IndexShard shard = indexServices.getShardOrNull(shardId);
+                /**
+                 * 分布式环境下shard分布在不同机器上，很可有能某个索引获取为null
+                 */
+                if (shard == null) {
+                    continue;
+                }
+                long count = shard.docStats().getCount();
                 if (count < minCount) {
                     minCount = count;
                     shardNo = i;
