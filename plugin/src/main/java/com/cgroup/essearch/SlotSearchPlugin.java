@@ -1,8 +1,5 @@
 package com.cgroup.essearch;
 
-import com.cgroup.esbulkrouting.FastBulkAction;
-import com.cgroup.esbulkrouting.FastBulkRestHandler;
-import com.cgroup.esbulkrouting.FastBulkTransportAction;
 import org.apache.logging.log4j.LogManager;
 import org.elasticsearch.action.ActionRequest;
 import org.elasticsearch.action.ActionResponse;
