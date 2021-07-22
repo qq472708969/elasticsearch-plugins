@@ -96,12 +96,17 @@ public class SlotSearchRestHandler extends BaseRestHandler {
      * Parses the rest request on top of the SearchRequest, preserving values that are not overridden by the rest request.
      *
      * @param requestContentParser body of the request to read. This method does not attempt to read the body from the {@code request}
-     *        parameter
-     * @param setSize how the size url parameter is handled. {@code udpate_by_query} and regular search differ here.
+     *                             parameter
+     * @param setSize              how the size url parameter is handled. {@code udpate_by_query} and regular search differ here.
      */
     public static void parseSearchRequest(SlotSearchRequest searchRequest, RestRequest request,
                                           XContentParser requestContentParser,
                                           IntConsumer setSize) throws IOException {
+
+        String routing = request.param("routing");
+        if (routing == null || "".equals(routing)) {
+            throw new IllegalArgumentException("_search_by_slot接口routing参数必须指定");
+        }
 
         if (searchRequest.source() == null) {
             searchRequest.source(new SearchSourceBuilder());
@@ -146,7 +151,7 @@ public class SlotSearchRestHandler extends BaseRestHandler {
         }
 
         searchRequest.types(Strings.splitStringByCommaToArray(request.param("type")));
-        searchRequest.routing(request.param("routing"));
+        searchRequest.routing(routing);
         searchRequest.preference(request.param("preference"));
         searchRequest.indicesOptions(IndicesOptions.fromRequest(request, searchRequest.indicesOptions()));
     }
