@@ -26,6 +26,7 @@ import static com.cgroup.esbulkrouting.FastBulkAction.SETTING_ROUTING_SLOT;
  */
 public class SlotOperationRouting extends OperationRouting {
     private final DeprecationLogger deprecationLogger = new DeprecationLogger(LogManager.getLogger(this.getClass()));
+    protected final org.apache.logging.log4j.Logger logger = LogManager.getLogger(this.getClass());
     private List<String> awarenessAttributes;
     private boolean useAdaptiveReplicaSelection;
 
@@ -71,6 +72,7 @@ public class SlotOperationRouting extends OperationRouting {
                     int shardStartIndex = slotNo * slotSize;
                     int shardEndIndex = shardStartIndex + slotSize;
                     for (int shardNo = shardStartIndex; shardNo < shardEndIndex; shardNo++) {
+                        logger.info("=====indexName:{},slotNo:{},shardNo:{}", index, slotNo, shardNo);
                         final int routingPartitionSize = indexMetaData.getRoutingPartitionSize();
                         for (int partitionOffset = 0; partitionOffset < routingPartitionSize; partitionOffset++) {
                             set.add(getShardRoutingTable(indexRouting, shardNo));

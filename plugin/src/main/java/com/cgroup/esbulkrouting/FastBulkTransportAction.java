@@ -509,7 +509,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                 ShardId shardId = new ShardId(indexName, indexUUID, i);
                 IndexShard shard = indexServices.getShardOrNull(shardId);
                 /**
-                 * 分布式环境下shard分布在不同机器上，很可有能某个索引获取为null
+                 * 集群环境下shard分布在不同机器上，很可有能某个索引获取为null
                  */
                 if (shard == null) {
                     continue;
