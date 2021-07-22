@@ -58,7 +58,7 @@ public class FastBulkRestHandler extends BaseRestHandler {
 
 
         Setting<Integer> integerSetting = Setting.intSetting(SETTING_ROUTING_SLOT, 1, 1, maxNumShards,
-                Setting.Property.IndexScope, Setting.Property.Final);
+                Setting.Property.Dynamic, Setting.Property.Final);
 
         try {
             Field keySettings = indexScopedSettings.getClass().getSuperclass().getDeclaredField("keySettings");
