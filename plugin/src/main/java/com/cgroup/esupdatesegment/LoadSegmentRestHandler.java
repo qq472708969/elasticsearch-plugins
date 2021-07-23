@@ -35,6 +35,10 @@ public class LoadSegmentRestHandler extends BaseRestHandler {
      * @param client
      * @return
      * @throws IOException
+     *
+     *
+     * 执行示例：
+     * http://127.0.0.1:9200/load/segment?indexName=e1&indexUUID=x&shardIdNo=0&documentPrimeKey=_id&segmentDirs=%2FUsers%2Fzzq%2FDocuments%2Fesearch%2Findex%2F
      */
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
