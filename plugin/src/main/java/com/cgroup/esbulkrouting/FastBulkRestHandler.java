@@ -6,7 +6,6 @@ import org.elasticsearch.action.bulk.BulkShardRequest;
 import org.elasticsearch.action.support.ActiveShardCount;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.settings.IndexScopedSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -15,6 +14,7 @@ import org.elasticsearch.rest.action.RestBuilderListener;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 
 import java.io.IOException;
+
 import static org.elasticsearch.rest.RestRequest.Method.POST;
 import static org.elasticsearch.rest.RestRequest.Method.PUT;
 
@@ -26,7 +26,7 @@ public class FastBulkRestHandler extends BaseRestHandler {
 
     private final boolean allowExplicitIndex;
 
-    public FastBulkRestHandler(Settings settings, RestController controller, IndexScopedSettings indexScopedSettings) {
+    public FastBulkRestHandler(Settings settings, RestController controller) {
         super(settings);
 
         /**

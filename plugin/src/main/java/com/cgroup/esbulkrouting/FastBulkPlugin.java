@@ -67,6 +67,6 @@ public class FastBulkPlugin extends Plugin implements ActionPlugin {
                                              ClusterSettings clusterSettings, IndexScopedSettings indexScopedSettings,
                                              SettingsFilter settingsFilter, IndexNameExpressionResolver indexNameExpressionResolver,
                                              Supplier<DiscoveryNodes> nodesInCluster) {
-        return Arrays.asList(new FastBulkRestHandler(settings, restController, indexScopedSettings));
+        return Arrays.asList(new FastBulkRestHandler(settings, restController));
     }
 }
