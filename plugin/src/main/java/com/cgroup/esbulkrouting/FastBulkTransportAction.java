@@ -35,7 +35,6 @@ import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.*;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.settings.SettingsFilter;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.AbstractRunnable;
 import org.elasticsearch.common.util.concurrent.AtomicArray;
@@ -77,7 +76,6 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
     private final TransportCreateIndexAction createIndexAction;
     private final LongSupplier relativeTimeProvider;
     private final IngestActionForwarder ingestForwarder;
-    private final SettingsFilter settingsFilter;
     private static final String DROPPED_ITEM_WITH_AUTO_GENERATED_ID = "auto-generated";
 
     @Inject
@@ -85,7 +83,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                                    ClusterService clusterService, IndicesService indexServices, IngestService ingestService,
                                    TransportShardBulkAction shardBulkAction, TransportCreateIndexAction createIndexAction,
                                    ActionFilters actionFilters, IndexNameExpressionResolver indexNameExpressionResolver,
-                                   AutoCreateIndex autoCreateIndex, SettingsFilter settingsFilter) {
+                                   AutoCreateIndex autoCreateIndex) {
         super(settings, FastBulkAction.NAME, threadPool, transportService, actionFilters, indexNameExpressionResolver, FastBulkRequest::new);
         LongSupplier relativeTimeProvider = System::nanoTime;
         this.clusterService = clusterService;
@@ -96,7 +94,6 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
         this.autoCreateIndex = autoCreateIndex;
         this.relativeTimeProvider = relativeTimeProvider;
         this.ingestForwarder = new IngestActionForwarder(transportService);
-        this.settingsFilter = settingsFilter;
         clusterService.addStateApplier(this.ingestForwarder);
     }
 
