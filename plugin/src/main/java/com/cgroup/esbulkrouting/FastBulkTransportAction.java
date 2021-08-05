@@ -38,10 +38,7 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.AbstractRunnable;
 import org.elasticsearch.common.util.concurrent.AtomicArray;
-import org.elasticsearch.index.Index;
-import org.elasticsearch.index.IndexNotFoundException;
-import org.elasticsearch.index.IndexSettings;
-import org.elasticsearch.index.VersionType;
+import org.elasticsearch.index.*;
 import org.elasticsearch.index.shard.IndexShard;
 import org.elasticsearch.index.shard.ShardId;
 import org.elasticsearch.indices.IndexClosedException;
@@ -500,11 +497,11 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
 
         private void littleHighPriority(String indexName, IndexMetaData esIndexMetaData, int routingNumShards) {
             String indexUUID = esIndexMetaData.getIndexUUID();
+            IndexService indexShards = indexServices.indexServiceSafe(new Index(indexName, indexUUID));
             logger.info("=====routingNumShards:{}", routingNumShards);
             long minCount = Long.MAX_VALUE;
             for (int i = 0; i < routingNumShards; i++) {
-                ShardId shardId = new ShardId(indexName, indexUUID, i);
-                IndexShard shard = indexServices.getShardOrNull(shardId);
+                IndexShard shard = indexShards.getShard(i);
                 /**
                  * 集群环境下shard分布在不同机器上，很可有能某个索引获取为null
                  */
