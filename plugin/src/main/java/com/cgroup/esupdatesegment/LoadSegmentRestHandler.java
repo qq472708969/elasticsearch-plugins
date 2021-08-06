@@ -38,6 +38,9 @@ public class LoadSegmentRestHandler extends BaseRestHandler {
      *
      *
      * 执行示例：
+     *
+     * 但外部使用时需要注意shardIdNo=0参数是针对node本地shard信息，不经过网络通信；所以要确定shardIdNo对应的机器ip以及端口，正确执行http访问
+     *
      * http://127.0.0.1:9200/load/segment?indexName=e1&indexUUID=x&shardIdNo=0&documentPrimeKey=_id&segmentDirs=%2FUsers%2Fzzq%2FDocuments%2Fesearch%2Findex%2F
      */
     @Override
