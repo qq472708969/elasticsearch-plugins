@@ -69,7 +69,6 @@ public class LoadSegmentExecutor {
         /**
          * 以新segment为准，移除掉旧的segment中数据；并且将新的lucene（segment）文件加入到shard中
          */
-        lIndexWriter.commit();
         Directory[] segmentDirectories = new Directory[segmentDirs.size()];
         for (int i = 0; i < segmentDirs.size(); i++) {
             FSDirectory directory = FSDirectory.open(Paths.get(segmentDirs.get(i)));
