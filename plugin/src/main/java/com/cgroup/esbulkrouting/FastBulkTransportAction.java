@@ -501,7 +501,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             logger.info("=====routingNumShards:{}", routingNumShards);
             long minCount = Long.MAX_VALUE;
             for (int i = 0; i < routingNumShards; i++) {
-                IndexShard shard = indexShards.getShard(i);
+                IndexShard shard = indexShards.getShardOrNull(i);
                 /**
                  * 集群环境下shard分布在不同机器上，很可有能某个索引获取为null
                  */
