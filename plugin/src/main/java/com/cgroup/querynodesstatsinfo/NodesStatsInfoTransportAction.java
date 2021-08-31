@@ -29,7 +29,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.function.Supplier;
 
 /**
  * Created by zzq on 2021/8/31.
@@ -43,20 +42,16 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
     private String transportNodeAction;
 
     @Inject
-    protected NodesStatsInfoTransportAction(Settings settings, String actionName, ThreadPool threadPool,
-                                            ClusterService clusterService, TransportService transportService, ActionFilters actionFilters,
-                                            IndexNameExpressionResolver indexNameExpressionResolver,
-                                            Supplier<NodesStatsInfoRequest> request, Supplier<NodeStatsRequest> nodeRequest,
-                                            String nodeExecutor,
-                                            Class<NodeStats> nodeResponseClass) {
-        super(settings, actionName, threadPool, transportService, actionFilters, indexNameExpressionResolver, request);
+    public NodesStatsInfoTransportAction(Settings settings, ThreadPool threadPool, NodeService nodeService,
+                                         ClusterService clusterService, TransportService transportService, ActionFilters actionFilters,
+                                         IndexNameExpressionResolver indexNameExpressionResolver) {
+        super(settings, NodesStatsInfoAction.NAME, threadPool, transportService, actionFilters, indexNameExpressionResolver, NodesStatsInfoRequest::new);
         this.clusterService = clusterService;
         this.transportService = transportService;
-        this.nodeResponseClass = nodeResponseClass;
-
-        this.transportNodeAction = actionName + "[n]";
-
-        transportService.registerRequestHandler(transportNodeAction, nodeRequest, nodeExecutor, new NodeTransportHandler());
+        this.nodeResponseClass = NodeStats.class;
+        this.transportNodeAction = NodesStatsInfoAction.NAME + "[n]";
+        this.nodeService = nodeService;
+        transportService.registerRequestHandler(transportNodeAction, NodeStatsInfoRequest::new, ThreadPool.Names.MANAGEMENT, new NodeTransportHandler());
     }
 
     @Override
@@ -118,8 +113,8 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
         return new NodesStatsResponse(clusterService.getClusterName(), responses, failures);
     }
 
-    protected NodeStatsRequest newNodeRequest(String nodeId, NodesStatsInfoRequest request) {
-        return new NodeStatsRequest(nodeId, request);
+    protected NodeStatsInfoRequest newNodeRequest(String nodeId, NodesStatsInfoRequest request) {
+        return new NodeStatsInfoRequest(nodeId, request);
     }
 
     class AsyncAction {
@@ -235,21 +230,21 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
         }
     }
 
-    protected NodeStats nodeOperation(NodeStatsRequest nodeStatsRequest) {
-        NodesStatsInfoRequest request = nodeStatsRequest.request;
+    protected NodeStats nodeOperation(NodeStatsInfoRequest nodeStatsInfoRequest) {
+        NodesStatsInfoRequest request = nodeStatsInfoRequest.request;
         return nodeService.stats(request.indices(), request.os(), request.process(), request.jvm(), request.threadPool(),
                 request.fs(), request.transport(), request.http(), request.breaker(), request.script(), request.discovery(),
                 request.ingest(), request.adaptiveSelection());
     }
 
-    public static class NodeStatsRequest extends BaseNodeRequest {
+    public static class NodeStatsInfoRequest extends BaseNodeRequest {
 
         NodesStatsInfoRequest request;
 
-        public NodeStatsRequest() {
+        public NodeStatsInfoRequest() {
         }
 
-        NodeStatsRequest(String nodeId, NodesStatsInfoRequest request) {
+        NodeStatsInfoRequest(String nodeId, NodesStatsInfoRequest request) {
             super(nodeId);
             this.request = request;
         }
@@ -268,15 +263,15 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
         }
     }
 
-    class NodeTransportHandler implements TransportRequestHandler<NodeStatsRequest> {
+    class NodeTransportHandler implements TransportRequestHandler<NodeStatsInfoRequest> {
 
         @Override
-        public void messageReceived(NodeStatsRequest request, TransportChannel channel, Task task) throws Exception {
+        public void messageReceived(NodeStatsInfoRequest request, TransportChannel channel, Task task) throws Exception {
             channel.sendResponse(nodeOperation(request));
         }
 
         @Override
-        public void messageReceived(NodeStatsRequest request, TransportChannel channel) throws Exception {
+        public void messageReceived(NodeStatsInfoRequest request, TransportChannel channel) throws Exception {
             channel.sendResponse(nodeOperation(request));
         }
 

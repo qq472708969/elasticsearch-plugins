@@ -1,12 +1,9 @@
 package com.cgroup.querynodesstatsinfo;
 
-import com.cgroup.esbulkrouting.FastBulkAction;
-import com.cgroup.esbulkrouting.FastBulkTransportAction;
 import jdk.nashorn.internal.runtime.logging.Logger;
 import org.apache.logging.log4j.LogManager;
 import org.elasticsearch.action.ActionRequest;
 import org.elasticsearch.action.ActionResponse;
-import org.elasticsearch.action.admin.cluster.node.stats.NodesStatsResponse;
 import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.common.settings.ClusterSettings;

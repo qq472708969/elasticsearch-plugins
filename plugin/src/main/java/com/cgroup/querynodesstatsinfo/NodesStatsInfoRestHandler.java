@@ -28,15 +28,15 @@ public class NodesStatsInfoRestHandler extends BaseRestHandler {
 
     public NodesStatsInfoRestHandler(Settings settings, RestController controller) {
         super(settings);
-        controller.registerHandler(GET, "/_nodes/stats", this);
-        controller.registerHandler(GET, "/_nodes/{nodeId}/stats", this);
+        controller.registerHandler(GET, "/_nodes/stats_info", this);
+        controller.registerHandler(GET, "/_nodes/{nodeId}/stats_info", this);
 
-        controller.registerHandler(GET, "/_nodes/stats/{metric}", this);
-        controller.registerHandler(GET, "/_nodes/{nodeId}/stats/{metric}", this);
+        controller.registerHandler(GET, "/_nodes/stats_info/{metric}", this);
+        controller.registerHandler(GET, "/_nodes/{nodeId}/stats_info/{metric}", this);
 
-        controller.registerHandler(GET, "/_nodes/stats/{metric}/{index_metric}", this);
+        controller.registerHandler(GET, "/_nodes/stats_info/{metric}/{index_metric}", this);
 
-        controller.registerHandler(GET, "/_nodes/{nodeId}/stats/{metric}/{index_metric}", this);
+        controller.registerHandler(GET, "/_nodes/{nodeId}/stats_info/{metric}/{index_metric}", this);
     }
 
     static final Map<String, Consumer<NodesStatsInfoRequest>> METRICS;
