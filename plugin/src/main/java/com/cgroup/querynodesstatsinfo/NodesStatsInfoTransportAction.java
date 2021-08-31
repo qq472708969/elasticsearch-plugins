@@ -150,6 +150,7 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
                 builder.withTimeout(request.timeout());
             }
             Constructor<NodeStats> declaredConstructor = NodeStats.class.getDeclaredConstructor();
+            declaredConstructor.setAccessible(true);
             for (int i = 0; i < nodes.length; i++) {
                 final int idx = i;
                 final DiscoveryNode node = nodes[i];

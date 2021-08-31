@@ -75,6 +75,16 @@ public class NodesStatsInfoRestHandler extends BaseRestHandler {
         return "nodes_stats_info_action";
     }
 
+    /**
+     * GET /_nodes/stats_info?attr=group_type|g2|g3
+     *
+     * rest接口
+     *
+     * @param request
+     * @param client
+     * @return
+     * @throws IOException
+     */
     @Override
     public RestChannelConsumer prepareRequest(final RestRequest request, final NodeClient client) throws IOException {
         String[] nodesIds = Strings.splitStringByCommaToArray(request.param("nodeId"));
