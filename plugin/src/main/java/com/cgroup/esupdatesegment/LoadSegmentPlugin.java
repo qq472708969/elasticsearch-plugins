@@ -25,11 +25,7 @@ import java.util.function.Supplier;
 @Logger
 public class LoadSegmentPlugin extends Plugin implements ActionPlugin {
     protected final org.apache.logging.log4j.Logger logger = LogManager.getLogger(this.getClass());
-    /**
-     * 在这里增加一个http接口
-     *
-     * @return
-     */
+
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
         return Arrays.asList(new ActionHandler<>(LoadSegmentAction.instance, LoadSegmentTransportAction.class));
@@ -40,11 +36,16 @@ public class LoadSegmentPlugin extends Plugin implements ActionPlugin {
         logger.info("LoadSegmentPlugins初始化");
     }
 
+    /**
+     * 在这里增加一个http接口
+     *
+     * @return
+     */
     @Override
     public List<RestHandler> getRestHandlers(Settings settings, RestController restController,
                                              ClusterSettings clusterSettings, IndexScopedSettings indexScopedSettings,
                                              SettingsFilter settingsFilter, IndexNameExpressionResolver indexNameExpressionResolver,
                                              Supplier<DiscoveryNodes> nodesInCluster) {
-        return Arrays.asList(new LoadSegmentRestHandler(settings,restController));
+        return Arrays.asList(new LoadSegmentRestHandler(settings, restController));
     }
 }
