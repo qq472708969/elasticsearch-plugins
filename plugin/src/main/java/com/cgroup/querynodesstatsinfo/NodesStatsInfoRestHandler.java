@@ -187,10 +187,10 @@ public class NodesStatsInfoRestHandler extends BaseRestHandler {
             nodesStatsInfoRequest.indices().includeSegmentFileSizes(request.paramAsBoolean("include_segment_file_sizes", false));
         }
 
-        return restChannel -> client.executeLocally(NodesStatsInfoAction.instance, nodesStatsInfoRequest, new RestActions.NodesResponseRestListener<NodesStatsResponse>(restChannel) {
+        return restChannel -> client.executeLocally(NodesStatsInfoAction.instance, nodesStatsInfoRequest, new RestActions.NodesResponseRestListener<NodesStatsResponse>(restChannel){
             @Override
-            public RestResponse buildResponse(NodesStatsResponse responses, XContentBuilder builder) throws Exception {
-                return new BytesRestResponse(RestStatus.OK, responses.toXContent(builder, ToXContent.EMPTY_PARAMS));
+            public RestResponse buildResponse(NodesStatsResponse response, XContentBuilder builder) throws Exception {
+                return super.buildResponse(response, builder);
             }
         });
     }
