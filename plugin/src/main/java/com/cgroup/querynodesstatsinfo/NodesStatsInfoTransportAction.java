@@ -4,7 +4,6 @@ import org.apache.logging.log4j.message.ParameterizedMessage;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.FailedNodeException;
 import org.elasticsearch.action.NoSuchNodeException;
-import org.elasticsearch.action.admin.cluster.node.reload.NodesReloadSecureSettingsResponse;
 import org.elasticsearch.action.admin.cluster.node.stats.*;
 import org.elasticsearch.action.support.ActionFilters;
 import org.elasticsearch.action.support.HandledTransportAction;
