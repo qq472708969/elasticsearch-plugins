@@ -62,7 +62,11 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
 
     @Override
     protected void doExecute(Task task, NodesStatsInfoRequest request, ActionListener<NodesStatsResponse> listener) {
-        new AsyncAction(task, request, listener).start();
+        try {
+            new AsyncAction(task, request, listener).start();
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -130,7 +134,7 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
             this.responses = new AtomicReferenceArray<>(request.concreteNodes().length);
         }
 
-        void start() {
+        void start() throws NoSuchMethodException {
             final DiscoveryNode[] nodes = request.concreteNodes();
             if (nodes.length == 0) {
                 // nothing to notify
@@ -141,6 +145,7 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
             if (request.timeout() != null) {
                 builder.withTimeout(request.timeout());
             }
+            Constructor<NodeStats> declaredConstructor = NodeStats.class.getDeclaredConstructor();
             for (int i = 0; i < nodes.length; i++) {
                 final int idx = i;
                 final DiscoveryNode node = nodes[i];
@@ -160,10 +165,7 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
                                     public NodeStats read(StreamInput in) throws IOException {
                                         NodeStats nodeResponse = null;
                                         try {
-                                            Constructor<NodeStats> declaredConstructor = NodeStats.class.getDeclaredConstructor();
                                             nodeResponse = declaredConstructor.newInstance();
-                                        } catch (NoSuchMethodException e) {
-                                            e.printStackTrace();
                                         } catch (IllegalAccessException e) {
                                             e.printStackTrace();
                                         } catch (InstantiationException e) {
