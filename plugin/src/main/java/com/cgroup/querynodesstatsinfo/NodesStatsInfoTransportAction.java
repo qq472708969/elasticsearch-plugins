@@ -77,8 +77,15 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
         assert request.concreteNodes() == null : "request concreteNodes shouldn't be set";
         String[] nodesIds = clusterState.nodes().resolveNodes(request.nodesIds());
         DiscoveryNodes discoveryNodes = clusterState.nodes();
-        List<DiscoveryNode> concreteNodes = new ArrayList<>();
         Map<String, Object> attr = request.getAttr();
+        /**
+         * 如果没有自定义属性值过滤需求，则不处理
+         */
+        if (attr == null || attr.size() == 0) {
+            request.setConcreteNodes(Arrays.stream(nodesIds).map(discoveryNodes::get).toArray(DiscoveryNode[]::new));
+            return;
+        }
+        List<DiscoveryNode> concreteNodes = new ArrayList<>();
         for (int i = 0; i < nodesIds.length; i++) {
             String nodeId = nodesIds[i];
             DiscoveryNode discoveryNode = discoveryNodes.get(nodeId);

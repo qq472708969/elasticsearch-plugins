@@ -192,10 +192,13 @@ public class NodesStatsInfoRestHandler extends BaseRestHandler {
      * @param nodesStatsInfoRequest
      */
     private void addAttrArea(RestRequest request, NodesStatsInfoRequest nodesStatsInfoRequest) {
-        Map<String, Object> attrMap = new HashMap<>(10);
         String attr = request.param("attr");
+        if (attr == null || "".equals(attr)) {
+            return;
+        }
+        Map<String, Object> attrMap = new HashMap<>(10);
         String[] attrAry = attr.split("\\,");
-        for (int i = 0; i < attr.length(); i++) {
+        for (int i = 0; i < attrAry.length; i++) {
             String[] kv = attr.split("\\|");
             attrMap.put(kv[0], kv[1]);
         }
