@@ -11,6 +11,7 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.rest.*;
+import org.elasticsearch.rest.action.RestActions;
 import org.elasticsearch.rest.action.RestBuilderListener;
 
 import java.io.IOException;
@@ -177,7 +178,7 @@ public class NodesStatsInfoRestHandler extends BaseRestHandler {
             nodesStatsInfoRequest.indices().includeSegmentFileSizes(request.paramAsBoolean("include_segment_file_sizes", false));
         }
 
-        return restChannel -> client.executeLocally(NodesStatsInfoAction.instance, nodesStatsInfoRequest, new RestBuilderListener<NodesStatsResponse>(restChannel) {
+        return restChannel -> client.executeLocally(NodesStatsInfoAction.instance, nodesStatsInfoRequest, new RestActions.NodesResponseRestListener<NodesStatsResponse>(restChannel) {
             @Override
             public RestResponse buildResponse(NodesStatsResponse responses, XContentBuilder builder) throws Exception {
                 return new BytesRestResponse(RestStatus.OK, responses.toXContent(builder, ToXContent.EMPTY_PARAMS));
@@ -199,8 +200,12 @@ public class NodesStatsInfoRestHandler extends BaseRestHandler {
         Map<String, Object> attrMap = new HashMap<>(10);
         String[] attrAry = attr.split("\\,");
         for (int i = 0; i < attrAry.length; i++) {
-            String[] kv = attr.split("\\|");
-            attrMap.put(kv[0], kv[1]);
+            String[] kv = attrAry[i].split("\\|");
+            List<String> values = new ArrayList<>();
+            for (int j = 1; j < kv.length && kv.length > 1; j++) {
+                values.add(kv[j]);
+            }
+            attrMap.put(kv[0], values);
         }
         nodesStatsInfoRequest.setAttr(attrMap);
     }

@@ -88,8 +88,11 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
             Set<String> sysSet = attributes.keySet();
             Set<String> differenceSet = Sets.intersection(userSet, sysSet);
             for (String key : differenceSet) {
-                if (Objects.equals(attr.get(key), attributes.get(key))) {
-                    concreteNodes.add(discoveryNode);
+                List<String> values = (List) attr.get(key);
+                for (String val : values) {
+                    if (Objects.equals(val, attributes.get(key))) {
+                        concreteNodes.add(discoveryNode);
+                    }
                 }
             }
         }
