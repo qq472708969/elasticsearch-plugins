@@ -54,6 +54,8 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
@@ -422,6 +424,8 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
 
             final AtomicInteger counter = new AtomicInteger(requestsByShard.size());
             String nodeId = clusterService.localNode().getId();
+            final AtomicLong maxExecuteMills = new AtomicLong(0L);
+            final LongAdder sumExecuteMills = new LongAdder();
             for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
                 final ShardId shardId = entry.getKey();
                 final List<BulkItemRequest> requests = entry.getValue();
@@ -434,9 +438,6 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                 }
                 long shardRequestStartMills = System.currentTimeMillis();
                 shardBulkAction.execute(bulkShardRequest, new ActionListener<BulkShardResponse>() {
-                    Long maxExecuteMills = 0L;
-                    Long sumExecuteMills = 0L;
-
                     @Override
                     public void onResponse(BulkShardResponse bulkShardResponse) {
                         //每个单独的ShardRequest返回时执行
@@ -448,9 +449,10 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                             responses.set(bulkItemResponse.getItemId(), bulkItemResponse);
                         }
                         long shardRequestExecuteMills = System.currentTimeMillis() - shardRequestStartMills;
-                        sumExecuteMills += shardRequestExecuteMills;
-                        if (shardRequestExecuteMills > maxExecuteMills) {
-                            maxExecuteMills = shardRequestExecuteMills;
+                        sumExecuteMills.add(shardRequestExecuteMills);
+                        long maxVal = maxExecuteMills.get();
+                        if (shardRequestExecuteMills > maxVal) {
+                            maxExecuteMills.compareAndSet(maxVal, shardRequestExecuteMills);
                         }
 
                         if (counter.decrementAndGet() == 0) {
@@ -478,7 +480,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                     private void finishHim() {
                         logger.info("fast_bulk_execute|itemSize={}|bulkShardRequestSize={}|totalMills={}|avgShardRequestMills={}|maxShardRequestMills={}"
                                 , itemSize.get(), requestsByShard.size(), (System.currentTimeMillis() - doRunStartMills)
-                                , (sumExecuteMills / requestsByShard.size()), maxExecuteMills);
+                                , (sumExecuteMills.sum() / requestsByShard.size()), maxExecuteMills.get());
                         listener.onResponse(new BulkResponse(responses.toArray(new BulkItemResponse[responses.length()]),
                                 buildTookInMillis(startTimeNanos)));
                     }
