@@ -299,7 +299,9 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
         private final ClusterStateObserver observer;
         private final Map<String, IndexNotFoundException> indicesThatCannotBeCreated;
         private int shardNo;
+        //槽位个数
         private int slotCount;
+        //每个槽位对应的容量（shard个数）
         private int slotSize;
         private int SLOT_COUNT_DEFAULT = -1;
 
