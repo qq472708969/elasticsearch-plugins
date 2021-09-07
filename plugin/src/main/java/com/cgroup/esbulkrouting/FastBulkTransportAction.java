@@ -549,6 +549,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
          *
          * @param routingTable
          * @param indexName
+         * @param slotCount    槽位数量
          * @param slotSize     每个槽位对应物理shard个数
          * @param routing      doc原生_routing属性
          * @param id           doc的原生_id属性
