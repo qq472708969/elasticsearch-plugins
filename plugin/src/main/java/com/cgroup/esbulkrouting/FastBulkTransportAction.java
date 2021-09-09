@@ -383,6 +383,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             // first, go over all the requests and create a ShardId -> Operations mapping
             Map<ShardId, List<BulkItemRequest>> requestsByShard = new HashMap<>();
             final AtomicInteger itemSize = new AtomicInteger(0);
+            int randomWriteFactor = getRandomNo();
             for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
                 FastDocWriteRequest request = (FastDocWriteRequest) fastBulkRequest.requests().get(i);
                 if (request == null) {
@@ -402,7 +403,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                         /**
                          * 该方法用来计算依据逻辑slot，映射到的物理shard
                          */
-                        shardId = getShardId(routingTable, concreteIndex, slotCount, slotSize, request.routing(), request.id());
+                        shardId = getShardId(routingTable, concreteIndex, slotCount, slotSize, request.routing(), request.id(), randomWriteFactor);
                     }
                 } else {
                     /**
@@ -557,7 +558,8 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
          * @param id           doc的原生_id属性
          * @return
          */
-        private ShardId getShardId(RoutingTable routingTable, String indexName, int slotCount, int slotSize, String routing, String id) throws NoSuchAlgorithmException {
+        private ShardId getShardId(RoutingTable routingTable, String indexName
+                , int slotCount, int slotSize, String routing, String id, int randomWriteFactor) {
             String effectiveRouting;
             if (routing == null) {
                 effectiveRouting = id;
@@ -570,9 +572,10 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
              * 获取槽儿位置
              */
             int slotNo = Math.floorMod(hashVal, slotCount);
-            int shardNo = Math.floorMod(getRandomNo(), slotSize) + slotNo * slotSize;
-            logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, shardNo);
-            return routingTable.shardRoutingTable(indexName, shardNo).shardId();
+            //按照固定的随机因子，映射到指定槽位的物理shard
+            int physicalShardNo = Math.floorMod(randomWriteFactor, slotSize) + slotNo * slotSize;
+            logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, physicalShardNo);
+            return routingTable.shardRoutingTable(indexName, physicalShardNo).shardId();
         }
 
         private int getRandomNo() throws NoSuchAlgorithmException {
