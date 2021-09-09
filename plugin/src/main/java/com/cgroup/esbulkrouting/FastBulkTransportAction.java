@@ -574,7 +574,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             int slotNo = Math.floorMod(hashVal, slotCount);
             //按照固定的随机因子，映射到指定槽位的物理shard
             int physicalShardNo = Math.floorMod(randomWriteFactor, slotSize) + slotNo * slotSize;
-            logger.info("=====effectiveRouting:{}  slotNo:{}  shardNo:{}", effectiveRouting, slotNo, physicalShardNo);
+            logger.info("=====effectiveRouting:{},slotNo:{},shardNo:{}", effectiveRouting, slotNo, physicalShardNo);
             return routingTable.shardRoutingTable(indexName, physicalShardNo).shardId();
         }
 
