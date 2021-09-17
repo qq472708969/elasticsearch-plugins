@@ -328,6 +328,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             }
             final ConcreteIndices concreteIndices = new ConcreteIndices(clusterState, indexNameExpressionResolver);
             MetaData metaData = clusterState.metaData();
+            int rankNo = Math.floorMod(getRandomNo(), slotSize);
             for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
                 DocWriteRequest docWriteRequest = fastBulkRequest.requests().get(i);
                 //the request can only be null because we set it to null in the previous step, so it gets ignored
@@ -383,7 +384,6 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             // first, go over all the requests and create a ShardId -> Operations mapping
             Map<ShardId, List<BulkItemRequest>> requestsByShard = new HashMap<>();
             final AtomicInteger itemSize = new AtomicInteger(0);
-            int randomWriteFactor = getRandomNo();
             for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
                 FastDocWriteRequest request = (FastDocWriteRequest) fastBulkRequest.requests().get(i);
                 if (request == null) {
@@ -403,7 +403,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
                         /**
                          * 该方法用来计算依据逻辑slot，映射到的物理shard
                          */
-                        shardId = getShardId(routingTable, concreteIndex, slotCount, slotSize, request.routing(), request.id(), randomWriteFactor);
+                        shardId = getShardId(routingTable, concreteIndex, slotCount, slotSize, request.routing(), request.id(), rankNo);
                     }
                 } else {
                     /**
@@ -559,7 +559,7 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
          * @return
          */
         private ShardId getShardId(RoutingTable routingTable, String indexName
-                , int slotCount, int slotSize, String routing, String id, int randomWriteFactor) {
+                , int slotCount, int slotSize, String routing, String id, int rankNo) {
             String effectiveRouting;
             if (routing == null) {
                 effectiveRouting = id;
@@ -572,8 +572,8 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
              * 获取槽儿位置
              */
             int slotNo = Math.floorMod(hashVal, slotCount);
-            //按照固定的随机因子，映射到指定槽位的物理shard
-            int physicalShardNo = Math.floorMod(randomWriteFactor, slotSize) + slotNo * slotSize;
+            //按照固定的随机因子生成的范围编号，映射到指定槽位的物理shard
+            int physicalShardNo = rankNo + slotNo * slotSize;
             logger.info("=====effectiveRouting:{},slotNo:{},shardNo:{}", effectiveRouting, slotNo, physicalShardNo);
             return routingTable.shardRoutingTable(indexName, physicalShardNo).shardId();
         }
