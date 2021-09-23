@@ -328,7 +328,10 @@ public class FastBulkTransportAction extends HandledTransportAction<FastBulkRequ
             }
             final ConcreteIndices concreteIndices = new ConcreteIndices(clusterState, indexNameExpressionResolver);
             MetaData metaData = clusterState.metaData();
-            int rankNo = Math.floorMod(getRandomNo(), slotSize);
+            int rankNo = 0;
+            if (slotSize > 0) {
+                rankNo = Math.floorMod(getRandomNo(), slotSize);
+            }
             for (int i = 0; i < fastBulkRequest.requests().size(); i++) {
                 DocWriteRequest docWriteRequest = fastBulkRequest.requests().get(i);
                 //the request can only be null because we set it to null in the previous step, so it gets ignored
