@@ -1,25 +1,22 @@
 package com.cgroup.stream;
 
-import org.apache.flink.api.common.functions.Partitioner;
-import org.apache.flink.api.common.state.*;
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.util.Collector;
 
 /**
  * Created by zzq on 2021/10/22.
  */
-public class StreamTest {
-    public static void main(String[] args) throws Exception {
+public class WIndowStream {
+    public static void main(String[] args) {
         Configuration conf = new Configuration();
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
@@ -81,37 +78,20 @@ public class StreamTest {
             }
         }).uid("addSource1");
 
-        DataStream<String> stringDataStream = stringDataStreamSource.partitionCustom(new Partitioner<String>() {
-            @Override
-            public int partition(String s, int i) {
-                if (s.endsWith("zzq8")) {
-                    return 0;
-                } else if (s.endsWith("zzq5")) {
-                    return 1;
-                } else {
-                    return 2;
-                }
 
-            }
-        }, new KeySelector<String, String>() {
-            @Override
-            public String getKey(String s) throws Exception {
-                return s.split("\\,")[1];
-            }
-        });
-
-        SingleOutputStreamOperator<String> countVS = stringDataStream.process(new StateProcessFunction<String, String>() {
+        stringDataStreamSource.keyBy((in) -> in.split("\\,")[1])
+                //这个可以通过现有提供的BoundedOutOfOrdernessTimestampExtractor来提供延时的watermark
+//                .assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor<String>() {
+//            @Override
+//            public long extractTimestamp(String element) {
+//                return 0;
+//            }
+//        })
+                .process(new KeyedProcessFunction<String, String, String>() {
             @Override
             public void processElement(String value, Context ctx, Collector<String> out) throws Exception {
-                count++;
-                long watermark = ctx.timerService().currentWatermark();
-                System.out.println("=value>>>" + value + "  =count>>>" + count + "  =watermark>>>" + watermark);
+
             }
-        }).uid("process1").setParallelism(6);
-
-
-        countVS.print().setParallelism(2);
-
-        env.execute();
+        });
     }
 }
