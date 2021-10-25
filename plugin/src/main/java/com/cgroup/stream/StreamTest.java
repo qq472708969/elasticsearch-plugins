@@ -21,7 +21,15 @@ import org.apache.flink.util.Collector;
 public class StreamTest {
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
-
+//        conf.setString("heartbeat.timeout", "18000000");
+//        conf.setString("resourcemanager.job.timeout", "18000000");
+//        conf.setString("resourcemanager.taskmanager-timeout", "18000000");
+//        conf.setString("slotmanager.request-timeout", "18000000");
+//        conf.setString("slotmanager.taskmanager-timeout", "18000000");
+//        conf.setString("slot.request.timeout", "18000000");
+//        conf.setString("slot.idle.timeout", "18000000");
+//        conf.setString("akka.ask.timeout", "18000000");
+//        conf.setString("taskmanager.numberOfTaskSlots", "1");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
         //使用时间触发
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);

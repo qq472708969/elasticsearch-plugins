@@ -1,5 +1,6 @@
 package com.cgroup.stream;
 
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
@@ -16,13 +17,13 @@ import org.apache.flink.util.Collector;
  * Created by zzq on 2021/10/22.
  */
 public class WIndowStream {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
-
+        conf.setString("taskmanager.numberOfTaskSlots","2");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
+//        env.setParallelism(6);
         //使用时间触发
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-
         env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
         //保证两次checkpoint操作间隔为500毫秒
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500L);
@@ -79,7 +80,7 @@ public class WIndowStream {
         }).uid("addSource1");
 
 
-        stringDataStreamSource.keyBy((in) -> in.split("\\,")[1])
+        stringDataStreamSource.map(in -> in).setParallelism(2).keyBy((in) -> in.split("\\,")[1])
                 //这个可以通过现有提供的BoundedOutOfOrdernessTimestampExtractor来提供延时的watermark
 //                .assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor<String>() {
 //            @Override
@@ -88,10 +89,16 @@ public class WIndowStream {
 //            }
 //        })
                 .process(new KeyedProcessFunction<String, String, String>() {
-            @Override
-            public void processElement(String value, Context ctx, Collector<String> out) throws Exception {
+                    @Override
+                    public void processElement(String value, Context ctx, Collector<String> out) throws Exception {
 
-            }
-        });
+                    }
+                }).disableChaining().print();
+
+        //展示执行计划
+        env.getExecutionPlan();
+
+
+        env.execute();
     }
 }
