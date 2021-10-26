@@ -1,23 +1,27 @@
 package com.cgroup.stream;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.datastream.ConnectedStreams;
-import org.apache.flink.streaming.api.datastream.KeyedStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.datastream.*;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks;
 import org.apache.flink.streaming.api.functions.co.KeyedCoProcessFunction;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.streaming.api.watermark.Watermark;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
 import javax.annotation.Nullable;
+import java.util.Iterator;
 
 /**
  * Created by zzq on 2021/10/26.
@@ -189,17 +193,19 @@ public class JoinEventTimeTest {
             public void processElement2(String value, Context ctx, Collector<String> out) throws Exception {
                 if (vs.value() != null) {
                     ctx.timerService().deleteEventTimeTimer(vs.value());
+                    vs.update(null);
                 }
 
                 String key = value.split("\\,")[1];
                 String mills = value.split("\\,")[0];
                 long l = Long.valueOf(mills) + 3L;
                 //如果定时器已经被清除，则重新添加新的定时器
-                if (vs.value() == null) {
+                String s = kkv.get(key);
+                if (vs.value() == null && s != null) {
                     ctx.timerService().registerEventTimeTimer(l);
                     vs.update(l);
                 }
-                String s = kkv.get(key);
+
                 kkv.remove(key);
                 if (StringUtils.isNotBlank(s)) {
                     this.out.update("输出了：>" + s);
@@ -217,7 +223,26 @@ public class JoinEventTimeTest {
 
         pe1.print();
 
-        env.getExecutionPlan();
+        SingleOutputStreamOperator<Integer> ret = pe1.map(new MapFunction<String, Integer>() {
+            @Override
+            public Integer map(String value) throws Exception {
+                return 1;
+            }
+        }).timeWindowAll(org.apache.flink.streaming.api.windowing.time.Time.seconds(1L)).reduce((num1, num2) -> num1 + num2);
+
+        Iterator<Integer> collect = DataStreamUtils.collect(ret);
+
+        Integer count = 0;
+        for (; collect.hasNext(); ) {
+            Integer next = collect.next();
+            count = count + next;
+            System.out.println("===>" + count);
+        }
+
+
+
+
+//        env.getExecutionPlan();
 
         env.execute();
     }
