@@ -194,8 +194,11 @@ public class JoinEventTimeTest {
                 String key = value.split("\\,")[1];
                 String mills = value.split("\\,")[0];
                 long l = Long.valueOf(mills) + 3L;
-                vs.update(l);
-                ctx.timerService().registerEventTimeTimer(l);
+                //如果定时器已经被清除，则重新添加新的定时器
+                if (vs.value() == null) {
+                    ctx.timerService().registerEventTimeTimer(l);
+                    vs.update(l);
+                }
                 String s = kkv.get(key);
                 kkv.remove(key);
                 if (StringUtils.isNotBlank(s)) {
