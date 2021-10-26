@@ -19,7 +19,7 @@ import org.apache.flink.util.Collector;
 public class WIndowStream {
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
-        conf.setString("taskmanager.numberOfTaskSlots","2");
+        conf.setString("taskmanager.numberOfTaskSlots","20");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
 //        env.setParallelism(6);
         //使用时间触发
