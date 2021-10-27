@@ -3,6 +3,7 @@ package com.cgroup.stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
@@ -22,6 +23,7 @@ import org.apache.flink.util.Collector;
 
 import javax.annotation.Nullable;
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by zzq on 2021/10/26.
@@ -43,6 +45,8 @@ public class JoinEventTimeTest {
         env.getCheckpointConfig().setCheckpointTimeout(5000L);
         //如果state执行checkpoint失败，则直接任务退出
         env.getCheckpointConfig().setFailOnCheckpointingErrors(true);
+        //恢复
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(5, Time.of(0, TimeUnit.SECONDS)));
 
         SingleOutputStreamOperator<String> stringDataStreamSource1 = env.addSource(new SourceFunction<String>() {
             boolean loop = true;
@@ -238,8 +242,6 @@ public class JoinEventTimeTest {
             count = count + next;
             System.out.println("===>" + count);
         }
-
-
 
 
 //        env.getExecutionPlan();
