@@ -6,6 +6,7 @@ import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -31,9 +32,10 @@ import java.util.concurrent.TimeUnit;
 public class JoinEventTimeTest {
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
-        conf.setString("taskmanager.numberOfTaskSlots", "20");
+        conf.setString("taskmanager.numberOfTaskSlots", "24");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
-//        env.setParallelism(6);
+        System.out.println(Runtime.getRuntime().availableProcessors());
+        env.setParallelism(6);
         //使用时间触发
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
@@ -50,11 +52,14 @@ public class JoinEventTimeTest {
 
         SingleOutputStreamOperator<String> stringDataStreamSource1 = env.addSource(new SourceFunction<String>() {
             boolean loop = true;
-            String key = ",zzq";
+            String key = ",zzq5";
+            int a = 1;
 
             @Override
             public void run(SourceContext<String> ctx) throws Exception {
+//                for (; a==1; ) {
                 for (; loop; ) {
+                    a++;
                     long mill = System.currentTimeMillis();
                     String s = mill + key;
 
@@ -91,15 +96,18 @@ public class JoinEventTimeTest {
             public void cancel() {
                 loop = false;
             }
-        }).uid("addSource1");
+        }).uid("addSource1").name("addSource1");
 
         SingleOutputStreamOperator<String> stringDataStreamSource2 = env.addSource(new SourceFunction<String>() {
             boolean loop = true;
-            String key = ",zzq";
+            String key = ",zzq5";
+            int a = 1;
 
             @Override
             public void run(SourceContext<String> ctx) throws Exception {
+//                for (; a==1; ) {
                 for (; loop; ) {
+                    a++;
                     long mill = System.currentTimeMillis();
                     String s = mill + key;
 
@@ -136,7 +144,17 @@ public class JoinEventTimeTest {
             public void cancel() {
                 loop = false;
             }
-        }).uid("addSource2");
+        }).uid("addSource2").name("addSource2");
+
+//        KeyedStream<String, String> stringStringKeyedStream = stringDataStreamSource2.slotSharingGroup("slot1").keyBy(new KeySelector<String, String>() {
+//            @Override
+//            public String getKey(String value) throws Exception {
+//                return value.split("\\,")[1];
+//            }
+//        });
+//
+//        stringStringKeyedStream.print().setParallelism(4).
+//                name("haha");
 
         KeyedStream<String, String> stringStringKeyedStream1 = stringDataStreamSource1
                 .assignTimestampsAndWatermarks(new AssignerWithPeriodicWatermarks<String>() {
@@ -234,18 +252,28 @@ public class JoinEventTimeTest {
             }
         }).timeWindowAll(org.apache.flink.streaming.api.windowing.time.Time.seconds(1L)).reduce((num1, num2) -> num1 + num2);
 
-        Iterator<Integer> collect = DataStreamUtils.collect(ret);
+        ret.map(new MapFunction<Integer, String>() {
+            @Override
+            public String map(Integer value) throws Exception {
+                return value + "";
+            }
+        }).print();
 
-        Integer count = 0;
-        for (; collect.hasNext(); ) {
-            Integer next = collect.next();
-            count = count + next;
-            System.out.println("===>" + count);
-        }
-
-
+//        Iterator<Integer> collect = DataStreamUtils.collect(ret);
+//
+//        Integer count = 0;
+//        for (; collect.hasNext(); ) {
+//            Integer next = collect.next();
+//            count = count + next;
+//            System.out.println("===>" + count);
+//
+//        }
 //        env.getExecutionPlan();
 
+        System.out.println(env.getExecutionPlan());
+
+
         env.execute();
+
     }
 }
