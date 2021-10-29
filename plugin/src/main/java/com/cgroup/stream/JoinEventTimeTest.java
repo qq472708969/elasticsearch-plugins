@@ -47,7 +47,7 @@ public class JoinEventTimeTest {
         env.getCheckpointConfig().setCheckpointTimeout(5000L);
         //如果state执行checkpoint失败，则直接任务退出
         env.getCheckpointConfig().setFailOnCheckpointingErrors(true);
-        //恢复
+        //恢复（重试5次， 重启之间的延时时间10）
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(5, Time.of(0, TimeUnit.SECONDS)));
 
         SingleOutputStreamOperator<String> stringDataStreamSource1 = env.addSource(new SourceFunction<String>() {
@@ -146,15 +146,15 @@ public class JoinEventTimeTest {
             }
         }).uid("addSource2").name("addSource2");
 
-//        KeyedStream<String, String> stringStringKeyedStream = stringDataStreamSource2.slotSharingGroup("slot1").keyBy(new KeySelector<String, String>() {
-//            @Override
-//            public String getKey(String value) throws Exception {
-//                return value.split("\\,")[1];
-//            }
-//        });
-//
-//        stringStringKeyedStream.print().setParallelism(4).
-//                name("haha");
+        KeyedStream<String, String> stringStringKeyedStream = stringDataStreamSource2.slotSharingGroup("slot1").keyBy(new KeySelector<String, String>() {
+            @Override
+            public String getKey(String value) throws Exception {
+                return value.split("\\,")[1];
+            }
+        });
+
+        stringStringKeyedStream.print().setParallelism(4).
+                name("haha");
 
         KeyedStream<String, String> stringStringKeyedStream1 = stringDataStreamSource1
                 .assignTimestampsAndWatermarks(new AssignerWithPeriodicWatermarks<String>() {
