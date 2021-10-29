@@ -38,8 +38,9 @@ public class JoinEventTimeTest {
         env.setParallelism(6);
         //使用时间触发
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+        //开启checkpoint机制，1000毫秒为发送barrier的间隔时长，
         env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
-        //保证两次checkpoint操作间隔为500毫秒
+        //保证两次checkpoint操作的最小间隔为500毫秒
         env.getCheckpointConfig().setMinPauseBetweenCheckpoints(500L);
         //任务被取消时，保留下state
         env.getCheckpointConfig().enableExternalizedCheckpoints(CheckpointConfig.ExternalizedCheckpointCleanup.RETAIN_ON_CANCELLATION);
