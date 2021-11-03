@@ -49,7 +49,17 @@ public class JoinEventTimeTest {
         //如果state执行checkpoint失败，则直接任务退出
         env.getCheckpointConfig().setFailOnCheckpointingErrors(true);
         //恢复（重试5次， 重启之间的延时时间10）
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(5, Time.of(0, TimeUnit.SECONDS)));
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(5, Time.of(10, TimeUnit.SECONDS)));
+
+        //也可以根据失败率重启
+        env.setRestartStrategy(RestartStrategies.failureRateRestart(
+                // 每个测量时间间隔最大失败次数
+                3,
+                // 失败率测量的时间间隔（5分钟测量失败了3次则重启）
+                Time.of(5,TimeUnit.MINUTES),
+                // 两次连续重启尝试的时间间隔
+                Time.of(10,TimeUnit.SECONDS)
+        ));
 
         SingleOutputStreamOperator<String> stringDataStreamSource1 = env.addSource(new SourceFunction<String>() {
             boolean loop = true;
