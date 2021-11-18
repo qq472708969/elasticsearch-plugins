@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Created by zzq on 2021/11/16/016.
- *
+ * <p>
  * 开窗聚合统计发生数据倾斜，可以使用随机后缀+时间窗口结束点+去后缀统计解决问题
  */
 public class DataTiltPrefix {
@@ -67,7 +67,7 @@ public class DataTiltPrefix {
                     String s = mill + key;
 
                     ctx.collect(s);
-                    ctx.emitWatermark(new Watermark(mill - 200L));
+                    ctx.emitWatermark(new Watermark(mill));
 
                     if (s.contains("5,zzq")) {
                         key = ",zzq5";
