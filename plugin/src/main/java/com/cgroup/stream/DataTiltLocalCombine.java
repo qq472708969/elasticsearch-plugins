@@ -96,7 +96,7 @@ public class DataTiltLocalCombine {
 
         source1.print();
 
-        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Tuple2<String, Integer>>(30) {
+        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Tuple2<String, Integer>>(10) {
             @Override
             public String getKey(String value) {
                 return value.split("\\,")[1];

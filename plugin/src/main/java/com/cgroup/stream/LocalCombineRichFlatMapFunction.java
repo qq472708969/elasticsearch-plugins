@@ -39,11 +39,13 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         String key = getKey(value);
         OUT currOut = getOut(value);
         Tuple2<String, OUT> tuple2 = countMap.get(key);
-        Tuple2<String, OUT> tuple2CalcValue = put(key, tuple2, currOut);
+        put(key, tuple2, currOut);
         if (countAi.incrementAndGet() <= batchSize) {
             return;
         }
-        out.collect(tuple2CalcValue.f1);
+        for (String itemKey : countMap.keySet()) {
+            out.collect(countMap.get(itemKey).f1);
+        }
         countMap.clear();
         countAi.set(0);
     }
@@ -87,8 +89,8 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
             return;
         }
         //将当前最新数据加入到状态中
-        for (String key : countMap.keySet()) {
-            localCombineLs.add(countMap.get(key));
+        for (String itemKey : countMap.keySet()) {
+            localCombineLs.add(countMap.get(itemKey));
         }
     }
 
@@ -109,10 +111,9 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         }
     }
 
-    public Tuple2<String, OUT> put(String key, Tuple2<String, OUT> tuple2CalcOut, OUT currOut) {
+    public void put(String key, Tuple2<String, OUT> tuple2CalcOut, OUT currOut) {
         Tuple2<String, OUT> newTuple2 = Tuple2.of(key
                 , tuple2CalcOut == null ? currOut : processOutValue0(currOut, tuple2CalcOut.f1));
         countMap.put(key, newTuple2);
-        return newTuple2;
     }
 }
