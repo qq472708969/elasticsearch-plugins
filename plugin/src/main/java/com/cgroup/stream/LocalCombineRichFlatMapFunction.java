@@ -43,8 +43,12 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         if (countAi.incrementAndGet() <= batchSize) {
             return;
         }
-        for (String itemKey : countMap.keySet()) {
-            out.collect(countMap.get(itemKey).f1);
+        for (String keyItem : countMap.keySet()) {
+            Tuple2<String, OUT> tuple2Item = countMap.get(keyItem);
+            if (tuple2Item == null) {
+                continue;
+            }
+            out.collect(tuple2Item.f1);
         }
         countMap.clear();
         countAi.set(0);
@@ -89,8 +93,8 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
             return;
         }
         //将当前最新数据加入到状态中
-        for (String itemKey : countMap.keySet()) {
-            localCombineLs.add(countMap.get(itemKey));
+        for (String keyItem : countMap.keySet()) {
+            localCombineLs.add(countMap.get(keyItem));
         }
     }
 
