@@ -96,20 +96,20 @@ public class DataTiltLocalCombine {
 
         source1.print();
 
-        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Integer>() {
+        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Tuple2<String, Integer>>(30) {
             @Override
             public String getKey(String value) {
                 return value.split("\\,")[1];
             }
 
             @Override
-            public Integer getOut(String value) {
-                return 1;
+            public Tuple2<String, Integer> getOut(String value) {
+                return Tuple2.of(value.split("\\,")[1], 1);
             }
 
             @Override
-            public Integer processOutValue0(Integer currValue, Integer calcValue) {
-                return currValue + calcValue;
+            public Tuple2<String, Integer> processOutValue0(Tuple2<String, Integer> currValue, Tuple2<String, Integer> calcValue) {
+                return Tuple2.of(currValue.f0, currValue.f1 + calcValue.f1);
             }
         }).print();
 
