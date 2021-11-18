@@ -89,11 +89,11 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
      */
     @Override
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
-        //清理原始状态
-        localCombineLs.clear();
         if (MapUtils.isEmpty(countMap)) {
             return;
         }
+        //清理原始状态
+        localCombineLs.clear();
         //将当前最新数据加入到状态中
         for (String keyItem : countMap.keySet()) {
             localCombineLs.add(countMap.get(keyItem));
