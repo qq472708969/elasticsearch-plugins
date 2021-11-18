@@ -21,7 +21,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
 
     ListState<Object> localCombineLs;
 
-    Map<String, Tuple2<String, OUT>> countMap = new HashMap<>();
+    Map<String, Tuple2<String, OUT>> countMap;
 
     AtomicInteger countAi;
 
@@ -97,6 +97,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         OperatorStateStore operatorStateStore = context.getOperatorStateStore();
         localCombineLs = operatorStateStore.getListState(new ListStateDescriptor("localCombineLsd", Object.class));
         countAi = new AtomicInteger(0);
+        countMap = new HashMap();
         //故障状态恢复计数Map
         if (!context.isRestored()) {
             return;
