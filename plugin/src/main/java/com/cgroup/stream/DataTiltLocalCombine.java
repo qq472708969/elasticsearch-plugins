@@ -54,7 +54,7 @@ public class DataTiltLocalCombine {
 
             @Override
             public void run(SourceContext<String> ctx) throws Exception {
-                for (; loop; ) {
+                for (; a < 10; ) {
                     a++;
                     long mill = System.currentTimeMillis();
                     String s = mill + key;
@@ -111,7 +111,7 @@ public class DataTiltLocalCombine {
             public Tuple2<String, Integer> processOutValue0(Tuple2<String, Integer> currValue, Tuple2<String, Integer> calcValue) {
                 return Tuple2.of(currValue.f0, currValue.f1 + calcValue.f1);
             }
-        }).print();
+        }).setParallelism(2).print();
 
 
 //        source1.keyBy(new KeySelector<String, String>() {

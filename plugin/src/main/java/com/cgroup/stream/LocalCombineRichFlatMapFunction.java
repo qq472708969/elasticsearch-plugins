@@ -1,5 +1,6 @@
 package com.cgroup.stream;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
@@ -50,6 +51,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
             }
             out.collect(tuple2Item.f1);
         }
+        //发送到下一个subTask后，可清空当前的集合统计值，不用做状态保存
         countMap.clear();
         countAi.set(0);
     }
@@ -89,7 +91,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
         //清理原始状态
         localCombineLs.clear();
-        if (countMap == null) {
+        if (MapUtils.isEmpty(countMap)) {
             return;
         }
         //将当前最新数据加入到状态中
