@@ -94,30 +94,32 @@ public class DataTiltLocalCombine {
             }
         }).uid("addSource1").name("addSource1").setParallelism(2);
 
-        source1.flatMap(new RichFlatMapFunction<String, String>() {
-            ListState<Tuple2<String, Integer>> localCombine;
+        source1.print();
 
-            Map<String, Tuple2<String, Integer>> countMap = new HashMap<>();
-
+        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Integer>() {
             @Override
-            public void open(Configuration parameters) throws Exception {
-                localCombine = getRuntimeContext().getListState(new ListStateDescriptor("localCombine", Tuple2.class));
-            }
-
-            @Override
-            public void flatMap(String value, Collector<String> out) throws Exception {
-
-
-            }
-        });
-
-
-        source1.keyBy(new KeySelector<String, String>() {
-            @Override
-            public String getKey(String value) throws Exception {
+            public String getKey(String value) {
                 return value.split("\\,")[1];
             }
+
+            @Override
+            public Integer getOut(String value) {
+                return 1;
+            }
+
+            @Override
+            public Integer processOutValue0(Integer currValue, Integer calcValue) {
+                return currValue + calcValue;
+            }
         }).print();
+
+
+//        source1.keyBy(new KeySelector<String, String>() {
+//            @Override
+//            public String getKey(String value) throws Exception {
+//                return value.split("\\,")[1];
+//            }
+//        }).print();
 
 
         env.execute();
