@@ -7,6 +7,7 @@ import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
@@ -103,6 +104,12 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         }
     }
 
+    /**
+     * 将状态数据初始化到应用的数据区（也可通过open方法初始化）
+     *
+     * @param context
+     * @throws Exception
+     */
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
         Type currType = this.getClass().getGenericSuperclass();
