@@ -32,11 +32,11 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
 
     private int batchSize = 100;
 
-    public LocalCombineRichFlatMapFunction(int batchSize) {
+    protected LocalCombineRichFlatMapFunction(int batchSize) {
         this.batchSize = batchSize;
     }
 
-    public LocalCombineRichFlatMapFunction() {
+    protected LocalCombineRichFlatMapFunction() {
     }
 
     @Override
@@ -48,8 +48,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         if (countAi.incrementAndGet() <= batchSize) {
             return;
         }
-        for (String keyItem : countMap.keySet()) {
-            Tuple2<String, OUT> tuple2Item = countMap.get(keyItem);
+        for (Tuple2<String, OUT> tuple2Item : countMap.values()) {
             if (tuple2Item == null) {
                 continue;
             }
@@ -99,8 +98,8 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         //清理原始状态
         localCombineLs.clear();
         //将当前最新数据加入到状态中
-        for (String keyItem : countMap.keySet()) {
-            localCombineLs.add(countMap.get(keyItem));
+        for (Tuple2<String, OUT> tuple2Item : countMap.values()) {
+            localCombineLs.add(tuple2Item);
         }
     }
 
