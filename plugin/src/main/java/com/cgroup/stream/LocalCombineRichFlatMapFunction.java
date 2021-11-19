@@ -4,6 +4,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
@@ -12,6 +13,8 @@ import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.util.Collector;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -103,8 +106,16 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
+        Type currType = this.getClass().getGenericSuperclass();
+        //强转为参数化类型实体
+        ParameterizedType currParameterizedType = (ParameterizedType) currType;
+        //获取具体实现泛型参数的列表
+        Type[] currTypeAry = currParameterizedType.getActualTypeArguments();
+        //获取OUT输出参数的实际类型
+        Type outType = currTypeAry[1];
         localCombineLs = context.getOperatorStateStore()
-                .getListState(new ListStateDescriptor<>("localCombineLsd", Types.TUPLE()));
+                .getListState(new ListStateDescriptor<Tuple2<String, OUT>>("localCombineLsd"
+                        , Types.TUPLE(Types.STRING, TypeInformation.of(outType.getClass()))));
         countAi = new AtomicInteger(0);
         countMap = new HashMap<>(batchSize * 3);
         //故障状态恢复计数Map

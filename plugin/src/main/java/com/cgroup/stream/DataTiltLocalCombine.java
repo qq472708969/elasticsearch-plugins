@@ -44,7 +44,7 @@ public class DataTiltLocalCombine {
         //如果state执行checkpoint失败，则直接任务退出
         env.getCheckpointConfig().setFailOnCheckpointingErrors(true);
         //恢复（重试5次， 重启之间的延时时间10）
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(5, Time.of(3, TimeUnit.SECONDS)));
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(2, Time.of(3, TimeUnit.SECONDS)));
 
 
         SingleOutputStreamOperator<String> source1 = env.addSource(new ParallelSourceFunction<String>() {
@@ -54,7 +54,7 @@ public class DataTiltLocalCombine {
 
             @Override
             public void run(SourceContext<String> ctx) throws Exception {
-                for (; a < 10; ) {
+                for (; loop; ) {
                     a++;
                     long mill = System.currentTimeMillis();
                     String s = mill + key;
@@ -111,7 +111,7 @@ public class DataTiltLocalCombine {
             public Tuple2<String, Integer> processOutValue0(Tuple2<String, Integer> currValue, Tuple2<String, Integer> calcValue) {
                 return Tuple2.of(currValue.f0, currValue.f1 + calcValue.f1);
             }
-        }).setParallelism(2).print();
+        }).print();
 
 
 //        source1.keyBy(new KeySelector<String, String>() {
