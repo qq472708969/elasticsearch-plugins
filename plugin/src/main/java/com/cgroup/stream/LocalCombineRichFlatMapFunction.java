@@ -4,10 +4,11 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
-import org.apache.flink.api.common.state.OperatorStateStore;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.util.Collector;
 
@@ -20,13 +21,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatMapFunction<IN, OUT> implements CheckpointedFunction {
 
-    ListState<Object> localCombineLs;
+    private ListState<Tuple2<String, OUT>> localCombineLs = null;
 
-    Map<String, Tuple2<String, OUT>> countMap;
+    private Map<String, Tuple2<String, OUT>> countMap;
 
-    AtomicInteger countAi;
+    private AtomicInteger countAi;
 
-    int batchSize = 100;
+    private int batchSize = 100;
 
     public LocalCombineRichFlatMapFunction(int batchSize) {
         this.batchSize = batchSize;
@@ -82,7 +83,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
     public abstract OUT processOutValue0(OUT currValue, OUT calcValue);
 
     /**
-     * 生成状态快照
+     * checkPoint状态定期生成
      *
      * @param context
      * @throws Exception
@@ -102,15 +103,18 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
-        OperatorStateStore operatorStateStore = context.getOperatorStateStore();
-        localCombineLs = operatorStateStore.getListState(new ListStateDescriptor("localCombineLsd", Object.class));
+        localCombineLs = context.getOperatorStateStore()
+                .getListState(new ListStateDescriptor<>("localCombineLsd", Types.TUPLE()));
         countAi = new AtomicInteger(0);
-        countMap = new HashMap();
+        countMap = new HashMap<>(batchSize * 3);
         //故障状态恢复计数Map
         if (!context.isRestored()) {
             return;
         }
-        Iterable<Tuple2<String, OUT>> tuple2s = (Iterable) localCombineLs.get();
+        Iterable<Tuple2<String, OUT>> tuple2s = localCombineLs.get();
+        if (Iterables.isEmpty(tuple2s)) {
+            return;
+        }
         for (Tuple2<String, OUT> tuple2 : tuple2s) {
             Tuple2<String, OUT> tuple2CalcValue = countMap.get(tuple2.f0);
             put(tuple2.f0, tuple2CalcValue, tuple2.f1);
