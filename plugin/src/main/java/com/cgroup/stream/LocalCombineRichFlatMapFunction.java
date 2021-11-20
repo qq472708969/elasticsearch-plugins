@@ -17,7 +17,6 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -124,7 +123,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
                 .getListState(new ListStateDescriptor<Tuple2<String, OUT>>("localCombineLsd"
                         , Types.TUPLE(Types.STRING, TypeInformation.of(outType.getClass()))));
         countAi = new AtomicInteger(0);
-        countMap = new ConcurrentHashMap<>(batchSize * 3);
+        countMap = new HashMap<>(batchSize * 3);
         //故障状态恢复计数Map
         if (!context.isRestored()) {
             return;
