@@ -17,6 +17,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -45,7 +46,8 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         OUT currOut = getOut(value);
         Tuple2<String, OUT> tuple2 = countMap.get(key);
         put(key, tuple2, currOut);
-        if (countAi.incrementAndGet() <= batchSize) {
+        //各key统计值达到上限后，触发输出
+        if (countAi.incrementAndGet() < batchSize) {
             return;
         }
         for (Tuple2<String, OUT> tuple2Item : countMap.values()) {
@@ -122,7 +124,7 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
                 .getListState(new ListStateDescriptor<Tuple2<String, OUT>>("localCombineLsd"
                         , Types.TUPLE(Types.STRING, TypeInformation.of(outType.getClass()))));
         countAi = new AtomicInteger(0);
-        countMap = new HashMap<>(batchSize * 3);
+        countMap = new ConcurrentHashMap<>(batchSize * 3);
         //故障状态恢复计数Map
         if (!context.isRestored()) {
             return;
