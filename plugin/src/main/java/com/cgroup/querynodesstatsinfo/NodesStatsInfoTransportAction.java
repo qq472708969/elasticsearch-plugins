@@ -17,7 +17,6 @@ import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.set.Sets;
 import org.elasticsearch.node.NodeService;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
@@ -80,22 +79,41 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
             return;
         }
         List<DiscoveryNode> concreteNodes = new ArrayList<>();
+        Map<String, List<String>> attrValues = new HashMap<>(6);
+        for (String key : attr.keySet()) {
+            Object o = attr.get(key);
+            if (o == null) {
+                continue;
+            }
+            List<String> values = (List) o;
+            if (values == null || values.size() == 0) {
+                continue;
+            }
+            attrValues.put(key, values);
+        }
         for (int i = 0; i < nodesIds.length; i++) {
             String nodeId = nodesIds[i];
             DiscoveryNode discoveryNode = discoveryNodes.get(nodeId);
             Map<String, String> attributes = discoveryNode.getAttributes();
-            Set<String> userSet = attr.keySet();
-            Set<String> sysSet = attributes.keySet();
-            Set<String> differenceSet = Sets.intersection(userSet, sysSet);
-            for (String key : differenceSet) {
-                List<String> values = (List) attr.get(key);
-                for (String val : values) {
-                    if (Objects.equals(val, attributes.get(key))) {
-                        concreteNodes.add(discoveryNode);
-                    }
+            if (attributes == null || attributes.size() == 0 || attrValues == null || attrValues.size() == 0) {
+                continue;
+            }
+            int count = 0;
+            for (Map.Entry<String, List<String>> et : attrValues.entrySet()) {
+                if (!attributes.containsKey(et.getKey())) {
+                    continue;
                 }
+                String value = attributes.get(et.getKey());
+                if (!et.getValue().contains(value)) {
+                    break;
+                }
+                count++;
+            }
+            if (count == attrValues.keySet().size()) {
+                concreteNodes.add(discoveryNode);
             }
         }
+
         request.setConcreteNodes(concreteNodes.stream().toArray(DiscoveryNode[]::new));
     }
 
