@@ -54,7 +54,7 @@ public class DataTiltLocalCombine {
 
             @Override
             public void run(SourceContext<String> ctx) throws Exception {
-                for (; loop; ) {
+                for (; a<=10; ) {
                     a++;
                     long mill = System.currentTimeMillis();
                     String s = mill + key;
@@ -96,7 +96,7 @@ public class DataTiltLocalCombine {
 
         source1.print();
 
-        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Tuple2<String, Integer>>(10) {
+        source1.flatMap(new LocalCombineRichFlatMapFunction<String, Tuple2<String, Integer>>(16) {
             @Override
             public String getKey(String value) {
                 return value.split("\\,")[1];
@@ -111,7 +111,7 @@ public class DataTiltLocalCombine {
             public Tuple2<String, Integer> processOutValue0(Tuple2<String, Integer> currValue, Tuple2<String, Integer> calcValue) {
                 return Tuple2.of(currValue.f0, currValue.f1 + calcValue.f1);
             }
-        }).print();
+        }).setParallelism(1).print();
 
 
 //        source1.keyBy(new KeySelector<String, String>() {

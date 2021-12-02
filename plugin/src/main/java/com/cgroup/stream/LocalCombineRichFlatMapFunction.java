@@ -45,7 +45,8 @@ public abstract class LocalCombineRichFlatMapFunction<IN, OUT> extends RichFlatM
         OUT currOut = getOut(value);
         Tuple2<String, OUT> tuple2 = countMap.get(key);
         put(key, tuple2, currOut);
-        if (countAi.incrementAndGet() <= batchSize) {
+        //各key统计值达到上限后，触发输出
+        if (countAi.incrementAndGet() < batchSize) {
             return;
         }
         for (Tuple2<String, OUT> tuple2Item : countMap.values()) {
