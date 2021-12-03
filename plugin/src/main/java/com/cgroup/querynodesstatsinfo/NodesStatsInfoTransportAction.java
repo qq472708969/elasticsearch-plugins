@@ -86,7 +86,7 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
                 continue;
             }
             List<String> values = (List) o;
-            if (values == null || values.size() == 0) {
+            if (values.isEmpty()) {
                 continue;
             }
             attrValues.put(key, values);
@@ -95,7 +95,7 @@ public class NodesStatsInfoTransportAction extends HandledTransportAction<NodesS
             String nodeId = nodesIds[i];
             DiscoveryNode discoveryNode = discoveryNodes.get(nodeId);
             Map<String, String> attributes = discoveryNode.getAttributes();
-            if (attributes == null || attributes.size() == 0 || attrValues == null || attrValues.size() == 0) {
+            if (attributes == null || attributes.size() == 0 || attrValues.size() == 0) {
                 continue;
             }
             int count = 0;

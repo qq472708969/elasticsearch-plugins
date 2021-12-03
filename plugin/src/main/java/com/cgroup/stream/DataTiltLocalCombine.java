@@ -56,6 +56,10 @@ public class DataTiltLocalCombine {
             public void run(SourceContext<String> ctx) throws Exception {
                 for (; a<=10; ) {
                     a++;
+                    if (a == 10) {
+                        throw new RuntimeException("我要报错");
+                    }
+
                     long mill = System.currentTimeMillis();
                     String s = mill + key;
 
