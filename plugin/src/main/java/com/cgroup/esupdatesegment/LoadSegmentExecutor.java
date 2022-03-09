@@ -3,6 +3,7 @@ package com.cgroup.esupdatesegment;
 import org.apache.lucene.index.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.index.engine.InternalEngine;
 import org.elasticsearch.index.shard.IndexShard;
@@ -71,7 +72,7 @@ public class LoadSegmentExecutor {
          */
         Directory[] segmentDirectories = new Directory[segmentDirs.size()];
         for (int i = 0; i < segmentDirs.size(); i++) {
-            FSDirectory directory = FSDirectory.open(Paths.get(segmentDirs.get(i)));
+            FSDirectory directory = MMapDirectory.open(Paths.get(segmentDirs.get(i)));
             //如果原Segment中没有文档，则直接跳过垃圾文档清除阶段
             if (lIndexWriter.getDocStats().numDocs > 0) {
                 removeCount += removeDuplicateDocument(directory, lIndexWriter, documentPrimeKey,
