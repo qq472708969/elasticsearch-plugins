@@ -3,10 +3,10 @@ package com.cgroup.synclinkrequest;
 /**
  * Created by zzq on 2022/3/11.
  */
-public enum RetState {
-    Success(1), Fail(0);
+public enum ResLinkState {
+    Success(1), Fail(0), None(-1);
 
-    RetState(int state) {
+    ResLinkState(int state) {
         this.state = state;
     }
 
