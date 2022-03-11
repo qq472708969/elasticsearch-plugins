@@ -1,4 +1,4 @@
-package com.cgroup.esbulkrouting;
+package com.cgroup.synclinkrequest;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -42,42 +42,30 @@ public class TestEs {
                 "}";
         request.setJsonEntity(null);
 
-        lowLevelClient.performRequestAsync(request, new ResponseListener() {
-            @Override
-            public void onSuccess(Response response) {
+        Response response = lowLevelClient.performRequest(request);
 
-                HttpEntity entity = response.getEntity();
+        HttpEntity entity = response.getEntity();
 
-                try {
-                    String s = EntityUtils.toString(entity);
+        try {
+            String s = EntityUtils.toString(entity);
 
-                    System.out.println(s);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+            System.out.println(s);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
 
-                System.out.println();
-                try {
-                    lowLevelClient.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        System.out.println();
+        try {
+            lowLevelClient.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-                try {
-                    client.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            @Override
-            public void onFailure(Exception exception) {
-                System.out.println();
-            }
-        });
-
-
-
+        try {
+            client.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
