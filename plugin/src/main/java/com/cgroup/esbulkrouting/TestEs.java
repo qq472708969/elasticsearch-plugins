@@ -30,11 +30,17 @@ public class TestEs {
 
         RestClient lowLevelClient = client.getLowLevelClient();
 
-        Request request = new Request("PUT", ".monitoring-es-6-2022.03.07/_settings");
+//        Request request = new Request("PUT", ".monitoring-es-6-2022.03.07/_settings");
+//        String json = "{\n" +
+//                "  \"routing.allocation.require.group_type\":\"g1\"\n" +
+//                "}";
+//        request.setJsonEntity(json);
+
+        Request request = new Request("GET", "/_cluster/state");
         String json = "{\n" +
                 "  \"routing.allocation.require.group_type\":\"g1\"\n" +
                 "}";
-        request.setJsonEntity(json);
+        request.setJsonEntity(null);
 
         lowLevelClient.performRequestAsync(request, new ResponseListener() {
             @Override
