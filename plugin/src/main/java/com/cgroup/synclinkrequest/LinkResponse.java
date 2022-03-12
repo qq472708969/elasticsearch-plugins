@@ -7,6 +7,7 @@ public class LinkResponse {
     private LinkResponseState state;
     private String data;
     private String msg;
+    private String requestInfo;
 
     {
         state = LinkResponseState.None;
@@ -34,5 +35,13 @@ public class LinkResponse {
 
     public void setMsg(String msg) {
         this.msg = msg;
+    }
+
+    public String getRequestInfo() {
+        return requestInfo;
+    }
+
+    public void setRequestInfo(String requestInfo) {
+        this.requestInfo = requestInfo;
     }
 }

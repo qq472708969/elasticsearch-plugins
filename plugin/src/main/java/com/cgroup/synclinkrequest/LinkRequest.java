@@ -50,6 +50,10 @@ public abstract class LinkRequest {
         return uri;
     }
 
+    public void setUri(String uri) {
+        this.uri = uri;
+    }
+
     /**
      * 发送请求之前可以根据上一个请求的返回值，对uri和jsonContent做参数动态调整。
      *
@@ -69,8 +73,10 @@ public abstract class LinkRequest {
      */
     protected abstract LinkResponseState processResponse(String currData, LinkResponse preLinkResponse);
 
-    public LinkResponse exec(RestClient restClient, LinkResponse preLinkResponse) {
+    public LinkResponse exec(RestClient restClient, LinkRequest currLinkRequest, LinkResponse preLinkResponse) {
         LinkResponse res = new LinkResponse();
+        //为响应体添加请求信息
+        res.setRequestInfo(buildRequestInfo(currLinkRequest));
         res.setState(LinkResponseState.None);
         processRequest(this, preLinkResponse);
         //如果三个参数均为空，则执行doExec方法，可灵活自定义es请求代码
@@ -95,5 +101,13 @@ public abstract class LinkRequest {
             e.printStackTrace();
         }
         return res;
+    }
+
+    private String buildRequestInfo(LinkRequest currLinkRequest) {
+        StringBuilder info = new StringBuilder();
+        info.append("[".concat(currLinkRequest.getHttpMethod()).concat("]"));
+        info.append("\n uri=".concat(currLinkRequest.getUri()));
+        info.append("\n jsonContent=".concat(currLinkRequest.getJsonContent()));
+        return info.toString();
     }
 }

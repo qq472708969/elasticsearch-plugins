@@ -41,7 +41,11 @@ public class LinkExecutor {
         LinkResponse tmp = new LinkResponse();
         for (int i = 0; i < requests.size(); i++) {
             LinkRequest linkRequest = requests.get(i);
-            LinkResponse linkResponse = linkRequest.exec(restClient, tmp);
+            LinkResponse linkResponse = linkRequest.exec(restClient, linkRequest, tmp);
+            //如果要求重新执行该算子，则外层循环暂停
+            for (; linkResponse.getState().equals(LinkResponseState.Repeat); ) {
+                linkResponse = linkRequest.exec(restClient, linkRequest, tmp);
+            }
             resList.add(linkResponse);
             //缓存前一个执行器的结果
             tmp = linkResponse;

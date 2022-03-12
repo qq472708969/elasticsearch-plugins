@@ -36,14 +36,11 @@ public class TestEs1 {
         };
 
 
-        LinkRequest l2 = new LinkRequest("PUT", ".monitoring-es-6-2022.03.07/_settings",
-                "{\n" +
-                        "  \"index.number_of_replicas\": \"0\",\n" +
-                        "  \"auto_expand_replicas\":\"false\"\n" +
-                        "}") {
+        LinkRequest l2 = new LinkRequest("GET", ".monitoring-es-6-2022.03.11/_count",
+                null) {
             @Override
             public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
-                System.out.println(preLinkResponse);
+//                System.out.println(preLinkResponse);
 
                 return LinkResponseState.Success;
             }
@@ -52,7 +49,8 @@ public class TestEs1 {
         LinkRequest l3 = new LinkRequest("PUT", ".monitoring-es-6-2022.03.07/_settings") {
             @Override
             public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
-                System.out.println(preLinkResponse);
+                System.out.println("909090");
+                System.out.println(preLinkResponse.getData());
 
                 return LinkResponseState.Success;
             }
@@ -66,12 +64,12 @@ public class TestEs1 {
 
         //client.close();
 
-        for (int i = 0; i < responses.size(); i++) {
-            LinkResponse linkResponse = responses.get(i);
-            System.out.println(linkResponse.getData());
-            System.out.println(linkResponse.getMsg());
-            System.out.println(linkResponse.getState());
-            System.out.println("============");
-        }
+//        for (int i = 0; i < responses.size(); i++) {
+//            LinkResponse linkResponse = responses.get(i);
+//            System.out.println(linkResponse.getData());
+//            System.out.println(linkResponse.getMsg());
+//            System.out.println(linkResponse.getState());
+//            System.out.println("============");
+//        }
     }
 }

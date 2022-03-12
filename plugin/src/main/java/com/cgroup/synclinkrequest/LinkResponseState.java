@@ -4,6 +4,8 @@ package com.cgroup.synclinkrequest;
  * Created by zzq on 2022/3/11.
  */
 public enum LinkResponseState {
+    //重复执行该算子
+    Repeat(999),
     //请求处理成功，继续执行流程
     Success(1),
     //请求处理失败，终止流程
