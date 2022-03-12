@@ -14,7 +14,12 @@ import java.io.IOException;
  */
 public class TestEs {
 
-    public static void main(String[] args) throws IOException {
+
+    public static void main(String[] args) {
+
+    }
+
+    public static void main1(String[] args) throws IOException {
 
         RestHighLevelClient client = new RestHighLevelClient(
                 RestClient.builder(

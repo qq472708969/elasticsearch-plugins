@@ -1,9 +1,10 @@
 package com.cgroup.synclinkrequest;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.elasticsearch.client.RestClient;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -11,21 +12,38 @@ import java.util.List;
  */
 public class LinkExecutor {
 
-    private final List<LinkRequest> requests;
-    private final RestClient restClient;
+    private List<LinkRequest> requests;
+    private RestClient restClient;
 
-    public LinkExecutor(List<LinkRequest> requests, RestClient restClient) {
+    public LinkExecutor(RestClient restClient, List<LinkRequest> requests) {
+        if (CollectionUtils.isEmpty(requests)) {
+            return;
+        }
         this.requests = requests;
         this.restClient = restClient;
     }
 
-    public List<LinkResponse> exec() throws IOException {
-        List<LinkResponse> resList = new ArrayList<>();
+    public LinkExecutor(RestClient restClient, LinkRequest... requests) {
+        if (requests == null || requests.length == 0) {
+            return;
+        }
+        this.requests = new ArrayList<>(Arrays.asList(requests));
+        this.restClient = restClient;
+    }
+
+    /**
+     * RestClient执行低级别API
+     *
+     * @return
+     */
+    public List<LinkResponse> exec() {
+        List<LinkResponse> resList = new ArrayList<>(5);
         for (int i = 0; i < requests.size(); i++) {
             LinkRequest linkRequest = requests.get(i);
-            LinkResponse linkResponse = linkRequest.execRequest(restClient);
-            //如果没有后续的请求，则直接结束掉
-            if (linkResponse.getState().equals(ResLinkState.None)) {
+            LinkResponse linkResponse = linkRequest.exec(restClient);
+            resList.add(linkResponse);
+            //请求执行非正常情况，则直接停止
+            if (!linkResponse.getState().equals(LinkResponseState.Success)) {
                 break;
             }
         }
