@@ -6,7 +6,6 @@ package com.cgroup.synclinkrequest;
 public class LinkResponse {
     private LinkResponseState state;
     private String data;
-    private String msg;
     private String requestInfo;
 
     {
@@ -27,14 +26,6 @@ public class LinkResponse {
 
     public void setData(String data) {
         this.data = data;
-    }
-
-    public String getMsg() {
-        return msg;
-    }
-
-    public void setMsg(String msg) {
-        this.msg = msg;
     }
 
     public String getRequestInfo() {

@@ -7,6 +7,7 @@ import org.elasticsearch.client.RestHighLevelClient;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by zzq on 2022/3/12.
@@ -27,22 +28,36 @@ public class TestEs2 {
 //            }
 //        };
 
-        LinkRequest l1 = new LinkRequest("DELETE", "/.monitoring-es-6-2022.03_dest", null) {
+        LinkRequest l1 = new LinkRequest("DELETE", "/.monitoring-es-6-2022.03_dest") {
             @Override
             public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
                 System.out.println(data);
+
                 if (data != null) {
                     return LinkResponseState.Success;
                 } else {
                     return LinkResponseState.Fail;
                 }
             }
+
+            @Override
+            protected LinkResponseState processIOException(String exceptionMsg, LinkResponse preLinkResponse) {
+                return LinkResponseState.Success;
+            }
+        };
+
+        LinkRequest l11 = new LinkRequest() {
+            @Override
+            public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
+                System.out.println("hahahah");
+                return LinkResponseState.Success;
+            }
         };
 
         LinkRequest l2 = new LinkRequest("POST", "_reindex?wait_for_completion=false",
                 "{\n" +
                         "  \"source\": {\n" +
-                        "    \"size\": 2,\n" +
+                        "    \"size\": 2000,\n" +
                         "    \"index\": \".monitoring-es-6-2022.03*\"\n" +
                         "  },\n" +
                         "  \"dest\": {\n" +
@@ -53,6 +68,7 @@ public class TestEs2 {
             @Override
             public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
                 System.out.println("删除的结果：" + preLinkResponse.getData());
+
                 if (data != null) {
                     return LinkResponseState.Success;
                 } else {
@@ -63,7 +79,7 @@ public class TestEs2 {
 
         LinkRequest l3 = new LinkRequest("GET") {
             @Override
-            protected void processRequest(LinkRequest currLinkRequest, LinkResponse preLinkResponse) {
+            protected void processPreRequest(LinkRequest currLinkRequest, LinkResponse preLinkResponse) {
                 currLinkRequest.setJsonContent(null);
                 JSONObject jsonObject = JSONObject.parseObject(preLinkResponse.getData());
                 String task = jsonObject.getString("task");
@@ -72,17 +88,15 @@ public class TestEs2 {
 
             @Override
             public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
-                JSONObject jsonObject = JSONObject.parseObject(preLinkResponse.getData());
+
+                JSONObject jsonObject = JSONObject.parseObject(data);
                 Boolean ret = jsonObject.getBoolean("completed");
                 if (ret) {
                     return LinkResponseState.Success;
                 } else {
+                    System.out.println(">>>>" + data);
                     System.out.println(">>>>" + ret);
-                    try {
-                        Thread.sleep(2000L);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+
                     return LinkResponseState.Repeat;
                 }
             }
@@ -91,23 +105,18 @@ public class TestEs2 {
         LinkRequest l4 = new LinkRequest("GET", "/_cluster/health") {
             @Override
             public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
+
                 System.out.println("health".concat(data));
                 return LinkResponseState.Success;
             }
         };
 
 
-        LinkExecutor executor = new LinkExecutor(client.getLowLevelClient(), l1, l2, l3, l4);
+        LinkExecutor executor = new LinkExecutor(client.getLowLevelClient(), l1, l11, l2, l3, l4);
+        executor.setSleepSecond(30);
         List<LinkResponse> responses = executor.exec();
 
         client.close();
 
-        for (int i = 0; i < responses.size(); i++) {
-            LinkResponse linkResponse = responses.get(i);
-            System.out.println(linkResponse.getData());
-            System.out.println(linkResponse.getMsg());
-            System.out.println(linkResponse.getState());
-            System.out.println("============");
-        }
     }
 }

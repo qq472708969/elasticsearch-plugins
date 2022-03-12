@@ -60,8 +60,19 @@ public abstract class LinkRequest {
      * @param currLinkRequest 当前的请求对象
      * @param preLinkResponse 前一个请求的返回结果
      */
-    protected void processRequest(LinkRequest currLinkRequest, LinkResponse preLinkResponse) {
+    protected void processPreRequest(LinkRequest currLinkRequest, LinkResponse preLinkResponse) {
 
+    }
+
+    /**
+     * 当出现IOException时，如果是流程内允许出现的，可通过该方法设置回LinkResponseState.Success
+     *
+     * @param exceptionMsg
+     * @param preLinkResponse
+     * @return
+     */
+    protected LinkResponseState processIOException(String exceptionMsg, LinkResponse preLinkResponse) {
+        return LinkResponseState.Exception;
     }
 
     /**
@@ -78,7 +89,7 @@ public abstract class LinkRequest {
         //为响应体添加请求信息
         res.setRequestInfo(buildRequestInfo(currLinkRequest));
         res.setState(LinkResponseState.None);
-        processRequest(this, preLinkResponse);
+        processPreRequest(this, preLinkResponse);
         //如果三个参数均为空，则执行doExec方法，可灵活自定义es请求代码
         if (StringUtils.isBlank(httpMethod)
                 && StringUtils.isBlank(uri)
@@ -97,17 +108,18 @@ public abstract class LinkRequest {
             res.setState(processResponse(data, preLinkResponse));
         } catch (IOException e) {
             res.setState(LinkResponseState.Exception);
-            res.setMsg("exception".concat("|").concat(e.getMessage()));
-            e.printStackTrace();
+            String exceptionMsg = "exception".concat("|").concat(e.getMessage());
+            res.setData(exceptionMsg);
+            res.setState(processIOException(exceptionMsg, preLinkResponse));
         }
         return res;
     }
 
     private String buildRequestInfo(LinkRequest currLinkRequest) {
         StringBuilder info = new StringBuilder();
-        info.append("[".concat(currLinkRequest.getHttpMethod()).concat("]"));
-        info.append("\n uri=".concat(currLinkRequest.getUri()));
-        info.append("\n jsonContent=".concat(currLinkRequest.getJsonContent()));
+        info.append("[".concat(currLinkRequest.getHttpMethod() == null ? "" : currLinkRequest.getHttpMethod()).concat("]"));
+        info.append("\n uri=".concat(currLinkRequest.getUri() == null ? "" : currLinkRequest.getUri()));
+        info.append("\n jsonContent=".concat(currLinkRequest.getJsonContent() == null ? "" : currLinkRequest.getJsonContent()));
         return info.toString();
     }
 }
