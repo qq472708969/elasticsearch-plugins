@@ -8,6 +8,10 @@ public class LinkResponse {
     private String data;
     private String msg;
 
+    {
+        state = LinkResponseState.None;
+    }
+
     public LinkResponseState getState() {
         return state;
     }

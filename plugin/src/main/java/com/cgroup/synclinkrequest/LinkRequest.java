@@ -27,6 +27,10 @@ public abstract class LinkRequest {
         this(httpMethod, uri, null);
     }
 
+    public LinkRequest(String httpMethod) {
+        this(httpMethod, null, null);
+    }
+
     public LinkRequest() {
     }
 
@@ -47,21 +51,33 @@ public abstract class LinkRequest {
     }
 
     /**
+     * 发送请求之前可以根据上一个请求的返回值，对uri和jsonContent做参数动态调整。
+     *
+     * @param currLinkRequest 当前的请求对象
+     * @param preLinkResponse 前一个请求的返回结果
+     */
+    protected void processRequest(LinkRequest currLinkRequest, LinkResponse preLinkResponse) {
+
+    }
+
+    /**
      * es-api返回结果处理方法
      *
-     * @param ret
+     * @param currData        当使用低级别api执行时，currData为当前模版执行流程返回的结果，如果在自定义流程中，则不关心该值
+     * @param preLinkResponse
      * @return
      */
-    protected abstract LinkResponseState doExec(String ret);
+    protected abstract LinkResponseState processResponse(String currData, LinkResponse preLinkResponse);
 
-    public LinkResponse exec(RestClient restClient) {
+    public LinkResponse exec(RestClient restClient, LinkResponse preLinkResponse) {
         LinkResponse res = new LinkResponse();
         res.setState(LinkResponseState.None);
+        processRequest(this, preLinkResponse);
         //如果三个参数均为空，则执行doExec方法，可灵活自定义es请求代码
         if (StringUtils.isBlank(httpMethod)
                 && StringUtils.isBlank(uri)
                 && StringUtils.isBlank(jsonContent)) {
-            res.setState(doExec(null));
+            res.setState(processResponse("", preLinkResponse));
             return res;
         }
 
@@ -70,9 +86,9 @@ public abstract class LinkRequest {
         try {
             Response response = restClient.performRequest(request);
             HttpEntity entity = response.getEntity();
-            String ret = EntityUtils.toString(entity);
-            res.setData(ret);
-            res.setState(doExec(ret));
+            String data = EntityUtils.toString(entity);
+            res.setData(data);
+            res.setState(processResponse(data, preLinkResponse));
         } catch (IOException e) {
             res.setState(LinkResponseState.Exception);
             res.setMsg("exception".concat("|").concat(e.getMessage()));

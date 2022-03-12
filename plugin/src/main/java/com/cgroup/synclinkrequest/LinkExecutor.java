@@ -38,10 +38,13 @@ public class LinkExecutor {
      */
     public List<LinkResponse> exec() {
         List<LinkResponse> resList = new ArrayList<>(5);
+        LinkResponse tmp = new LinkResponse();
         for (int i = 0; i < requests.size(); i++) {
             LinkRequest linkRequest = requests.get(i);
-            LinkResponse linkResponse = linkRequest.exec(restClient);
+            LinkResponse linkResponse = linkRequest.exec(restClient, tmp);
             resList.add(linkResponse);
+            //缓存前一个执行器的结果
+            tmp = linkResponse;
             //请求执行非正常情况，则直接停止
             if (!linkResponse.getState().equals(LinkResponseState.Success)) {
                 break;
