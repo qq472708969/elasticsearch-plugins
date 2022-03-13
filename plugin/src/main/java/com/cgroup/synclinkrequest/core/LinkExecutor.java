@@ -15,7 +15,14 @@ public class LinkExecutor {
 
     private List<LinkRequest> requests;
     private RestClient restClient;
+    /**
+     * 执行算子时，循环一次的间隔时间
+     */
     private long sleepSecond;
+    /**
+     * 循环多少次无果后退出
+     */
+    private int repeatLimit;
 
     public LinkExecutor(RestClient restClient, List<LinkRequest> requests) {
         if (CollectionUtils.isEmpty(requests)) {
@@ -23,7 +30,8 @@ public class LinkExecutor {
         }
         this.requests = requests;
         this.restClient = restClient;
-        sleepSecond = -1L;
+        sleepSecond = 3L;
+        repeatLimit = Integer.MAX_VALUE;
     }
 
     public LinkExecutor(RestClient restClient, LinkRequest... requests) {
@@ -32,11 +40,16 @@ public class LinkExecutor {
         }
         this.requests = new ArrayList<>(Arrays.asList(requests));
         this.restClient = restClient;
-        sleepSecond = -1L;
+        sleepSecond = 3L;
+        repeatLimit = Integer.MAX_VALUE;
     }
 
-    public void setSleepSecond(int second) {
+    public void setSleepSecond(long second) {
         this.sleepSecond = second;
+    }
+
+    public void setRepeatLimit(int repeatLimit) {
+        this.repeatLimit = repeatLimit - 1;
     }
 
     /**
@@ -51,9 +64,12 @@ public class LinkExecutor {
             LinkRequest linkRequest = requests.get(i);
             LinkResponse linkResponse = linkRequest.exec(restClient, linkRequest, tmp);
             //如果要求重新执行该算子，则外层循环暂停
-            for (; linkResponse.getState().equals(LinkResponseState.Repeat); ) {
+            int times = 0;
+            for (; linkResponse.getState().equals(LinkResponseState.Repeat)
+                    && repeatLimit > 0
+                    && times < repeatLimit; times++) {
                 //不为初始值，则执行线程将进入即时等待状态
-                if (sleepSecond != -1L) {
+                if (sleepSecond > 0L) {
                     try {
                         TimeUnit.SECONDS.sleep(sleepSecond);
                     } catch (Exception e) {

@@ -61,7 +61,8 @@ public class Load {
                 Boolean shardsAcknowledged = currDataJson.getBoolean("shards_acknowledged");
                 if (acknowledged != null
                         && shardsAcknowledged != null
-                        && shardsAcknowledged && acknowledged) {
+                        && shardsAcknowledged
+                        && acknowledged) {
                     return LinkResponseState.Success;
                 }
 

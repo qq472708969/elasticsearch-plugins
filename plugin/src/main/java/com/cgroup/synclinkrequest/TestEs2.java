@@ -60,7 +60,7 @@ public class TestEs2 {
         LinkRequest l2 = new LinkRequest("POST", "_reindex?wait_for_completion=false",
                 "{\n" +
                         "  \"source\": {\n" +
-                        "    \"size\": 2000,\n" +
+                        "    \"size\": 7000,\n" +
                         "    \"index\": \".monitoring-es-6-2022.03*\"\n" +
                         "  },\n" +
                         "  \"dest\": {\n" +
@@ -116,7 +116,7 @@ public class TestEs2 {
 
 
         LinkExecutor executor = new LinkExecutor(client.getLowLevelClient(), l1, l11, l2, l3, l4);
-        executor.setSleepSecond(30);
+        executor.setRepeatLimit(10);
         List<LinkResponse> responses = executor.exec();
 
         client.close();
