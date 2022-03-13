@@ -5,7 +5,7 @@ package com.cgroup.synclinkrequest.core;
  */
 public enum LinkResponseState {
     //重复执行该算子
-    Repeat(999),
+    Repeat(10000),
     //请求处理成功，继续执行流程
     Success(1),
     //请求处理失败，终止流程
