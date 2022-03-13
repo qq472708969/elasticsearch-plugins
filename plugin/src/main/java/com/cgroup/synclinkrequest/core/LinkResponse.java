@@ -1,4 +1,4 @@
-package com.cgroup.synclinkrequest;
+package com.cgroup.synclinkrequest.core;
 
 /**
  * Created by zzq on 2022/3/11.

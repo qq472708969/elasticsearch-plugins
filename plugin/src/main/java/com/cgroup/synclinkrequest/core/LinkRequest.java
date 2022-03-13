@@ -1,4 +1,4 @@
-package com.cgroup.synclinkrequest;
+package com.cgroup.synclinkrequest.core;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;

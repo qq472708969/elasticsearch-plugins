@@ -1,4 +1,4 @@
-package com.cgroup.synclinkrequest;
+package com.cgroup.synclinkrequest.core;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.elasticsearch.client.RestClient;
