@@ -71,7 +71,26 @@ public class Load {
         };
 
 
-        LinkExecutor executor = new LinkExecutor(client.getLowLevelClient(), l1, l2);
+        LinkRequest l3 = new LinkRequest("DELETE", "/.monitoring-es-6-2022.03.07_bak") {
+            @Override
+            public LinkResponseState processResponse(String data, LinkResponse preLinkResponse) {
+                System.out.println(data);
+
+                if (data != null) {
+                    return LinkResponseState.Success;
+                } else {
+                    return LinkResponseState.Fail;
+                }
+            }
+
+            @Override
+            protected LinkResponseState processIOException(String exceptionMsg, LinkResponse preLinkResponse) {
+                return LinkResponseState.Success;//如果遇到返回异常信息错误，则直接忽略掉
+            }
+        };
+
+
+        LinkExecutor executor = new LinkExecutor(client.getLowLevelClient(), l1, l2, l3);
         executor.setSleepSecond(30);
         List<LinkResponse> responses = executor.exec();
 
