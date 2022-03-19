@@ -17,13 +17,14 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Created by zzq on 2022/3/17.
- *
+ * <p>
  * 处理时间，使用定时器
  */
 public class TimerTest {
@@ -45,6 +46,7 @@ public class TimerTest {
         //恢复（重试5次， 重启之间的延时时间10）
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(2, Time.of(3, TimeUnit.SECONDS)));
 
+//        OutputTag<String> outputTag = new OutputTag("abc");
 
         DataStreamSource<String> stringDataStreamSource = env.addSource(new SourceFunction<String>() {
 
@@ -111,6 +113,10 @@ public class TimerTest {
             public void processElement(String s, Context context, Collector<String> collector) throws Exception {
                 String state = s.split("\\|")[1];
                 //当前key为失败的数据状态，并且flinkState为false
+                if ("fail".equals(state)) {
+//                    context.output(outputTag, s);
+                }
+
                 if ("fail".equals(state) && Objects.isNull(registrationState.value())) {
                     //当前key发生的"处理时间戳"，增加6秒的定时器
                     long l = context.timerService().currentProcessingTime() + 6000;
@@ -138,12 +144,15 @@ public class TimerTest {
             @Override
             public void onTimer(long timestamp, OnTimerContext ctx, Collector<String> out) throws Exception {
                 String s = "报警啦，5秒没有成功，" + ctx.getCurrentKey();
+
                 out.collect(s);
                 registrationState.clear();
             }
         });
 
         registrationState.print();
+
+//        registrationState.getSideOutput(outputTag).print("侧输出通道");
 
 
         env.execute();
