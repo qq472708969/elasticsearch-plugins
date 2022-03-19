@@ -16,7 +16,7 @@ public class BaseProvider<T> {
     protected String buildConditionStatement(T t, String extra, boolean allowEmpty) throws IllegalAccessException {
         Class<?> clazz = t.getClass();
         StringBuilder conditionStr = new StringBuilder(64);
-        while (clazz != null) {
+        for (; clazz != null; ) {
             for (Field field : clazz.getDeclaredFields()) {
                 field.setAccessible(true);
                 if (((field.getModifiers() & java.lang.reflect.Modifier.STATIC) == java.lang.reflect.Modifier.STATIC)
