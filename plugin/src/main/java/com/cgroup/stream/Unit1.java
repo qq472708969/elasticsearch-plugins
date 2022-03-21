@@ -19,11 +19,14 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +41,6 @@ public class Unit1 {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
         env.setParallelism(1);
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
-
         //开启checkpoint机制，1000毫秒为发送barrier的间隔时长，
         env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
         //保证两次checkpoint操作的最小间隔为500毫秒
@@ -52,13 +54,22 @@ public class Unit1 {
         env.getCheckpointConfig().setPreferCheckpointForRecovery(true);
         env.setStateBackend(new FsStateBackend("file:///D:/elasticsearch-plugins/plugin/src/main"));
         //恢复（重试2次， 重启之间的延时时间3）
-        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(5, org.apache.flink.api.common.time.Time.of(3, TimeUnit.SECONDS)));
+        env.setRestartStrategy(RestartStrategies.fixedDelayRestart(2, org.apache.flink.api.common.time.Time.of(5, TimeUnit.SECONDS)));
         /**
          * 每100毫秒标记一次Watermark
          */
         env.getConfig().setAutoWatermarkInterval(100L);
 
-        DataStreamSource<String> stringDataStreamSource = env.socketTextStream("127.0.0.1", 9999);
+        SingleOutputStreamOperator<String> stringDataStreamSource = env.socketTextStream("127.0.0.1", 9999)
+                //处理乱序数据  等5秒
+                .assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor<String>(Time.seconds(5L)) {
+                    @Override
+                    public long extractTimestamp(String element) {
+                        return System.currentTimeMillis();
+                    }
+                });
+
+        OutputTag<Tuple2<String, Integer>> outputTag = new OutputTag<Tuple2<String, Integer>>("abc"){};
 
         SingleOutputStreamOperator<Tuple2<String, Integer>> reduce = stringDataStreamSource.flatMap(new FlatMapFunction<String, Tuple2<String, Integer>>() {
             @Override
@@ -79,7 +90,9 @@ public class Unit1 {
             public String getKey(Tuple2<String, Integer> stringIntegerTuple2) throws Exception {
                 return stringIntegerTuple2.f0;
             }
-        }).window(TumblingProcessingTimeWindows.of(Time.seconds(3L)))
+        }).window(TumblingEventTimeWindows.of(Time.seconds(1L)))
+                .allowedLateness(Time.seconds(1L))
+                .sideOutputLateData(outputTag)
                 .process(new ProcessWindowFunction<Tuple2<String, Integer>, Tuple2<String, Integer>, String, TimeWindow>() {
                     public MapState<String, Integer> registrationState = null;
 
@@ -102,6 +115,8 @@ public class Unit1 {
                 });
 
         reduce.print();
+
+        reduce.getSideOutput(outputTag);
 
         env.execute();
 
