@@ -19,6 +19,8 @@ import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
+import org.apache.flink.streaming.api.watermark.Watermark;
 import org.apache.flink.streaming.api.windowing.time.Time;
 
 import java.util.List;
@@ -34,7 +36,7 @@ public class TestCEP {
         conf.setString("taskmanager.numberOfTaskSlots", "24");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
         env.setParallelism(1);
-        //env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         //开启checkpoint机制，1000毫秒为发送barrier的间隔时长，
         env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
         //保证两次checkpoint操作的最小间隔为500毫秒
@@ -55,7 +57,7 @@ public class TestCEP {
         env.getConfig().setAutoWatermarkInterval(100L);
 
 
-        DataStreamSource<String> stringDataStreamSource = env.addSource(new SourceFunction<String>() {
+        SingleOutputStreamOperator<String> stringDataStreamSource = env.addSource(new SourceFunction<String>() {
 
             String ph = "13687980889";
             String state0 = "success";
@@ -78,7 +80,6 @@ public class TestCEP {
                         Thread.sleep(599L);
                         continue;
                     }
-
                     sourceContext.collect(ph + "," + state0);
                     count++;
 
@@ -91,7 +92,13 @@ public class TestCEP {
             public void cancel() {
                 ret = false;
             }
-        });
+        })
+                .assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor<String>(Time.seconds(1L)) {
+                    @Override
+                    public long extractTimestamp(String s) {
+                        return System.currentTimeMillis();
+                    }
+                });
 
         Pattern<String, String> patternLogin = Pattern.
 
