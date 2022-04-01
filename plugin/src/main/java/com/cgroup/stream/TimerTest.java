@@ -30,7 +30,10 @@ import java.util.concurrent.TimeUnit;
 public class TimerTest {
     public static void main(String[] args) throws Exception {
         Configuration conf = new Configuration();
+        conf.setString("taskmanager.numberOfTaskSlots", "2");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
+
+        env.setParallelism(2);
         //使用时间触发
         env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
         //开启checkpoint机制，1000毫秒为发送barrier的间隔时长，
@@ -74,7 +77,7 @@ public class TimerTest {
                     }
 
 
-                    Thread.sleep(799L);
+                    Thread.sleep(600L);
                 }
             }
 
@@ -155,6 +158,6 @@ public class TimerTest {
 //        registrationState.getSideOutput(outputTag).print("侧输出通道");
 
 
-        env.execute();
+        env.execute("---ghghgh");
     }
 }
