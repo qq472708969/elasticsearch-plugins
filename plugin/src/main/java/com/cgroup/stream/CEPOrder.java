@@ -32,7 +32,7 @@ public class CEPOrder {
         conf.setString("taskmanager.numberOfTaskSlots", "24");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironmentWithWebUI(conf);
         env.setParallelism(1);
-        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+//        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         //开启checkpoint机制，1000毫秒为发送barrier的间隔时长，
         env.enableCheckpointing(1000L, CheckpointingMode.EXACTLY_ONCE);
         //保证两次checkpoint操作的最小间隔为500毫秒
@@ -53,13 +53,13 @@ public class CEPOrder {
         env.getConfig().setAutoWatermarkInterval(100L);
 
         //消息格式，订单+动作
-        SingleOutputStreamOperator<String> socketTextStream = env.socketTextStream("127.0.0.1", 9999)
-                .assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor<String>(Time.seconds(2L)) {
-                    @Override
-                    public long extractTimestamp(String s) {
-                        return System.currentTimeMillis();
-                    }
-                });
+        SingleOutputStreamOperator<String> socketTextStream = env.socketTextStream("127.0.0.1", 9999);
+//                .assignTimestampsAndWatermarks(new BoundedOutOfOrdernessTimestampExtractor<String>(Time.seconds(2L)) {
+//                    @Override
+//                    public long extractTimestamp(String s) {
+//                        return System.currentTimeMillis();
+//                    }
+//                });
 
         Pattern<String, String> orderProcessor = Pattern
                 .<String>begin("created").where(new IterativeCondition<String>() {
@@ -86,7 +86,7 @@ public class CEPOrder {
             }
         }), orderProcessor);
 
-        OutputTag<String> timeoutOrder = new OutputTag("timeout-order") {
+        OutputTag<String> timeoutOrder = new OutputTag<String>("timeout-order") {
         };
 
         SingleOutputStreamOperator<String> select = orderStream.select(timeoutOrder

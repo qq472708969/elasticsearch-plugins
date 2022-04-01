@@ -48,7 +48,7 @@ public class TimerTest {
         env.getCheckpointConfig().setFailOnCheckpointingErrors(true);
         //恢复（重试5次， 重启之间的延时时间10）
         env.setRestartStrategy(RestartStrategies.fixedDelayRestart(2, Time.of(3, TimeUnit.SECONDS)));
-
+        env.disableOperatorChaining();//禁止槽共享
 //        OutputTag<String> outputTag = new OutputTag("abc");
 
         DataStreamSource<String> stringDataStreamSource = env.addSource(new SourceFunction<String>() {
@@ -77,7 +77,7 @@ public class TimerTest {
                     }
 
 
-                    Thread.sleep(600L);
+                    Thread.sleep(6L);
                 }
             }
 
