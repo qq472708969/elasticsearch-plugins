@@ -1,9 +1,7 @@
 package com.cgroup.stream;
 
-import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.eventtime.*;
 import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.restartstrategy.RestartStrategies;
 import org.apache.flink.api.common.state.*;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -13,16 +11,12 @@ import org.apache.flink.runtime.state.filesystem.FsStateBackend;
 import org.apache.flink.shaded.guava18.com.google.common.collect.Iterables;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.CheckpointConfig;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
-import org.apache.flink.streaming.api.windowing.triggers.EventTimeTrigger;
 import org.apache.flink.streaming.api.windowing.triggers.Trigger;
 import org.apache.flink.streaming.api.windowing.triggers.TriggerResult;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
@@ -30,11 +24,12 @@ import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 
 import java.time.Duration;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
  * Created by zzq on 2022/3/20/020.
+ *
+ * 触发器练习
  */
 public class Unit1 {
     public static void main(String[] args) throws Exception {
@@ -62,8 +57,7 @@ public class Unit1 {
          */
         env.getConfig().setAutoWatermarkInterval(100L);
 
-        SingleOutputStreamOperator<Tuple2<String, Integer>> stringDataStreamSource = env.socketTextStream("127.0.0.1", 9999)
-                .flatMap(new FlatMapFunction<String, Tuple2<String, Integer>>() {
+        SingleOutputStreamOperator<Tuple2<String, Integer>> stringDataStreamSource = env.socketTextStream("127.0.0.1", 9999).flatMap(new FlatMapFunction<String, Tuple2<String, Integer>>() {
                     @Override
                     public void flatMap(String s, Collector<Tuple2<String, Integer>> collector) throws Exception {
                         if ("null".equals(s)) {
@@ -79,8 +73,8 @@ public class Unit1 {
                     }
                 })
                 //处理乱序数据  等5秒
-                .assignTimestampsAndWatermarks(WatermarkStrategy
-                        .<Tuple2<String, Integer>>forBoundedOutOfOrderness(Duration.ofSeconds(1L))
+                .assignTimestampsAndWatermarks(WatermarkStrategy.
+                        <Tuple2<String, Integer>>forBoundedOutOfOrderness(Duration.ofSeconds(1L))
                         .withTimestampAssigner(new TimestampAssignerSupplier<Tuple2<String, Integer>>() {
                             @Override
                             public TimestampAssigner<Tuple2<String, Integer>> createTimestampAssigner(Context context) {
@@ -103,36 +97,29 @@ public class Unit1 {
         OutputTag<Tuple2<String, Integer>> outputTag = new OutputTag<Tuple2<String, Integer>>("abc") {
         };
 
-        SingleOutputStreamOperator<Tuple2<String, Integer>> reduce = stringDataStreamSource
-                .keyBy(new KeySelector<Tuple2<String, Integer>, String>() {
+        SingleOutputStreamOperator<Tuple2<String, Integer>> reduce = stringDataStreamSource.keyBy(new KeySelector<Tuple2<String, Integer>, String>() {
                     @Override
                     public String getKey(Tuple2<String, Integer> stringIntegerTuple2) throws Exception {
                         return stringIntegerTuple2.f0.split("\\-")[0];
                     }
                 }).window(TumblingEventTimeWindows.of(Time.seconds(3L)))
                 //使用ProcessingTime自定义Trigger来处理EventTime在长时间无数据的情况下无法关窗问题
+                // new ValueStateDescriptor<Long>("close", Long.class)
                 .trigger(new Trigger<Tuple2<String, Integer>, TimeWindow>() {
 
                     @Override
                     public TriggerResult onElement(Tuple2<String, Integer> element, long timestamp, TimeWindow window, TriggerContext ctx) throws Exception {
-                        ValueState<Long> close = ctx.getKeyValueState("close", Long.class, 0L);
-//                        ValueState<Long> close = ctx.getPartitionedState(new ValueStateDescriptor<Long>("close", Long.class));
+                        ValueState<Long> close = ctx.getPartitionedState(new ValueStateDescriptor<Long>("close", Long.class));
                         Long closeTimer = close.value();
                         long timestamp1 = System.currentTimeMillis();
-                        if (closeTimer == 0L) {
-                            //记录当前的系统处理时间，用系统时间作为关窗都低逻辑
-                            close.update(timestamp1 + 10000);
-                            //10秒后触发关窗
-                            ctx.registerProcessingTimeTimer(timestamp1 + 10000);
-                        } else {
+                        //记录当前的系统处理时间，用系统时间作为关窗都低逻辑
+                        if (closeTimer != null) {
                             //如果已经有了兜底关窗数据，则更新定时器的触发时间，并重新记录
                             ctx.deleteProcessingTimeTimer(closeTimer);
-                            ctx.registerProcessingTimeTimer(timestamp1 + 10000);
-                            close.update(timestamp1 + 10000);
                         }
-
-
-//                        ctx.registerProcessingTimeTimer(timestamp + 9000L);
+                        //10秒后触发关窗
+                        ctx.registerProcessingTimeTimer(timestamp1 + 10000);
+                        close.update(timestamp1 + 10000);
                         return TriggerResult.CONTINUE;
                     }
 
@@ -143,7 +130,7 @@ public class Unit1 {
 
                     @Override
                     public TriggerResult onEventTime(long time, TimeWindow window, TriggerContext ctx) throws Exception {
-                        return TriggerResult.CONTINUE;
+                        return TriggerResult.FIRE_AND_PURGE;
                     }
 
                     @Override
