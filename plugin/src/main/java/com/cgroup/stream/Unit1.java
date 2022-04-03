@@ -105,40 +105,39 @@ public class Unit1 {
                     }
                 }).window(TumblingEventTimeWindows.of(Time.seconds(3L)))
                 //使用ProcessingTime自定义Trigger来处理EventTime在长时间无数据的情况下无法关窗问题
-                // new ValueStateDescriptor<Long>("close", Long.class)
-//                .trigger(new Trigger<Tuple2<String, Integer>, TimeWindow>() {
-//
-//                    @Override
-//                    public TriggerResult onElement(Tuple2<String, Integer> element, long timestamp, TimeWindow window, TriggerContext ctx) throws Exception {
-//                        ValueState<Long> close = ctx.getPartitionedState(new ValueStateDescriptor<Long>("close", Long.class));
-//                        Long closeTimer = close.value();
-//                        long timestamp1 = System.currentTimeMillis();
-//                        //记录当前的系统处理时间，用系统时间作为关窗都低逻辑
-//                        if (closeTimer != null) {
-//                            //如果已经有了兜底关窗数据，则更新定时器的触发时间，并重新记录
-//                            ctx.deleteProcessingTimeTimer(closeTimer);
-//                        }
-//                        //10秒后触发关窗
-//                        ctx.registerProcessingTimeTimer(timestamp1 + 10000);
-//                        close.update(timestamp1 + 10000);
-//                        return TriggerResult.CONTINUE;
-//                    }
-//
-//                    @Override
-//                    public TriggerResult onProcessingTime(long time, TimeWindow window, TriggerContext ctx) throws Exception {
-//                        return TriggerResult.FIRE_AND_PURGE;
-//                    }
-//
-//                    @Override
-//                    public TriggerResult onEventTime(long time, TimeWindow window, TriggerContext ctx) throws Exception {
-//                        return TriggerResult.FIRE_AND_PURGE;
-//                    }
-//
-//                    @Override
-//                    public void clear(TimeWindow window, TriggerContext ctx) throws Exception {
-//
-//                    }
-//                })
+                .trigger(new Trigger<Tuple2<String, Integer>, TimeWindow>() {
+
+                    @Override
+                    public TriggerResult onElement(Tuple2<String, Integer> element, long timestamp, TimeWindow window, TriggerContext ctx) throws Exception {
+                        ValueState<Long> close = ctx.getPartitionedState(new ValueStateDescriptor<Long>("close", Long.class));
+                        Long closeTimer = close.value();
+                        long timestamp1 = System.currentTimeMillis();
+                        //记录当前的系统处理时间，用系统时间作为关窗都低逻辑
+                        if (closeTimer != null) {
+                            //如果已经有了兜底关窗数据，则更新定时器的触发时间，并重新记录
+                            ctx.deleteProcessingTimeTimer(closeTimer);
+                        }
+                        //10秒后触发关窗
+                        ctx.registerProcessingTimeTimer(timestamp1 + 10000);
+                        close.update(timestamp1 + 10000);
+                        return TriggerResult.CONTINUE;
+                    }
+
+                    @Override
+                    public TriggerResult onProcessingTime(long time, TimeWindow window, TriggerContext ctx) throws Exception {
+                        return TriggerResult.FIRE_AND_PURGE;
+                    }
+
+                    @Override
+                    public TriggerResult onEventTime(long time, TimeWindow window, TriggerContext ctx) throws Exception {
+                        return TriggerResult.FIRE_AND_PURGE;
+                    }
+
+                    @Override
+                    public void clear(TimeWindow window, TriggerContext ctx) throws Exception {
+
+                    }
+                })
 //                .allowedLateness(Time.seconds(3L))
 //                .sideOutputLateData(outputTag)
                 .process(new ProcessWindowFunction<Tuple2<String, Integer>, Tuple2<String, Integer>, String, TimeWindow>() {
