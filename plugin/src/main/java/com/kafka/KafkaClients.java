@@ -14,10 +14,9 @@ import java.util.Properties;
  */
 public class KafkaClients {
     private volatile static KafkaClients self;
-    private Map<String, Producer<String, byte[]>> clients = new HashMap<>(3);
-    private Map<String, KafkaConnectionInfo> connections = new HashMap<>(3);
+    private Map<String, KafkaConnectionInfo> kafkaInfo = new HashMap<>(3);
 
-    public static KafkaClients init(List<KafkaConnectionInfo> connectionInfo) {
+    public static KafkaClients init(List<KafkaConnectionParams> connectionInfo) {
         if (self == null) {
             synchronized (KafkaClients.class) {
                 if (self == null) {
@@ -28,24 +27,25 @@ public class KafkaClients {
         return self;
     }
 
-    private KafkaClients(List<KafkaConnectionInfo> connectionInfo) {
+    private KafkaClients(List<KafkaConnectionParams> connectionInfo) {
         if (CollectionUtils.isEmpty(connectionInfo)) {
             throw new RuntimeException("connectionInfo is empty");
         }
         for (int i = 0; i < connectionInfo.size(); i++) {
-            KafkaConnectionInfo kafkaConnectionInfo = connectionInfo.get(i);
-            Producer<String, byte[]> producer = new KafkaProducer<>(getProperties(kafkaConnectionInfo.getHost()));
-            clients.put(kafkaConnectionInfo.getName(), producer);
-            connections.put(kafkaConnectionInfo.getName(), kafkaConnectionInfo);
+            KafkaConnectionParams kafkaConnectionParams = connectionInfo.get(i);
+            Producer<String, byte[]> producer = new KafkaProducer<>(getProperties(kafkaConnectionParams.getHost()));
+            KafkaConnectionInfo kafkaConnectionInfo = new KafkaConnectionInfo(kafkaConnectionParams);
+            kafkaConnectionInfo.setProducer(producer);
+            kafkaInfo.put(kafkaConnectionInfo.getName(), kafkaConnectionInfo);
         }
     }
 
     public Producer<String, byte[]> getClient(String key) {
-        return clients.get(key);
+        return kafkaInfo.get(key).getProducer();
     }
 
     public KafkaConnectionInfo getKafkaConnectionInfo(String key) {
-        return connections.get(key);
+        return kafkaInfo.get(key);
     }
 
     private Properties getProperties(List<String> hosts) {
